@@ -198,13 +198,12 @@ def generalised_travel_time(config) -> DataSource:
                     factor = tvom.get(income_level)
                     for i in range(num_zones):
                         for j in range(num_zones):
-                            if car_time_matrix[i][j] >= 7:
-                                total_time = car_time_matrix[i][j] + \
-                                    parking_times[i][1] + parking_times[j][2]
-                                total_cost = car_time_matrix[i][j] * time_costs_no_car.get(
-                                    kind) + car_distance_matrix[i][j] * (costs_no_car.get(kind) + road_pricing)
-                                ggr_skim[i][j] = total_time + \
-                                    factor * total_cost
+                            total_time = car_time_matrix[i][j]
+                            total_cost = car_time_matrix[i][j] * \
+                                time_costs_no_car.get(kind) + \
+                                car_distance_matrix[i][j] * (costs_no_car.get(kind) + road_pricing)
+                            ggr_skim[i][j] = total_time + \
+                                factor * total_cost
 
                     key = DataKey(id=f'{kind}',
                                   part_of_day=pod,
