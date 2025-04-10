@@ -38,6 +38,7 @@ old_config = """
     ],
     "ketens": {
       "gebruiken": false,
+      "bestand": "",
       "naam hub": ""
     },
     "welke_inkomensgroepen": [

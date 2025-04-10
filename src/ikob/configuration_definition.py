@@ -28,8 +28,9 @@ def config_item(
         default = default_values.get(data_type, default)
 
     # The default value is expected as list when more items are present.
-    if items and isinstance(default, str):
-        default = [default]
+    if data_type != DataType.CHOICE:
+        if items and isinstance(default, str):
+            default = [default]
 
     dictionary = {"label": label, "type": data_type.value, "default": default}
 

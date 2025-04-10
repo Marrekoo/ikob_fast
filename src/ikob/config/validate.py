@@ -82,13 +82,17 @@ def _validateItems(values, template):
     if type(values) is not list:
         return False
     for item in values:
-        if item not in template.items:
+        if item not in template["items"]:
             return False
     return True
 
 
+def _validateBox(value, template):
+    return value in [True, False]
+
+
 def _validateChoice(value, template):
-    if value not in template.items:
+    if value not in template["items"]:
         return False
     return True
 
@@ -117,11 +121,13 @@ def validateConfigWithTemplate(config, template, strict=False):
                 "number": _validateNumber,
                 "directory": _validateText,
                 "file": _validateText,
-                "checkbox": _validateItems,
+                "checkbox": _validateBox,
                 "checklist": _validateItems,
                 "choice": _validateChoice,
             }
-            check.get(template[key]["type"], _false)(config[key], template[key])
+            if not check.get(template[key]["type"], _false)(config[key], template[key]):
+                return False
         elif type(template[key]) is dict:
-            return validateConfigWithTemplate(config[key], template[key], strict=strict)
+            if not validateConfigWithTemplate(config[key], template[key], strict=strict):
+                return False
     return True

@@ -97,6 +97,7 @@
   "ketens": {
     "chains": {
       "gebruiken": false,
+      "bestand": "",
       "naam hub": ""
     },
     "bestemmingslijst": {
