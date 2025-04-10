@@ -33,9 +33,9 @@ old_config = """
     "motieven": [
       "werk"
     ],
-    "fiets of E-fiets": [
-        "Fiets"
-    ],
+    "fiets of E-fiets": {
+        "E-fiets": false
+    },
     "ketens": {
       "gebruiken": false,
       "bestand": "",
@@ -130,20 +130,20 @@ def test_load_fixable_config(tmpdir):
 
 
 @pytest.mark.parametrize(
-    "gui_tab, key, invalid_value",
+    "gui_tab, key, item, invalid_value",
     [
-        ("project", "fiets of E-fiets", ["not-allowed-value"]),
-        ("project", "fiets of E-fiets", "not-allowed-value"),
+        ("project", "fiets of E-fiets", "E-fiets", ["not-allowed-value"]),
+        ("project", "fiets of E-fiets", "E-fiets", "not-allowed-value"),
     ],
 )
-def test_detect_invalid_choice(tmpdir, gui_tab, key, invalid_value):
+def test_detect_invalid_choice(tmpdir, gui_tab, key, item, invalid_value):
     # Assert the original file loads properly.
     filename = pathlib.Path("tests/vlaanderen/vlaanderen.json")
     _ = loadConfig(filename)
 
     # Insert invalid entries.
     config = json.loads(filename.read_text())
-    config[gui_tab][key] = invalid_value
+    config[gui_tab][key][item] = invalid_value
 
     tmpfile = pathlib.Path(tmpdir, "config.json")
     with open(tmpfile, "w") as fp:
