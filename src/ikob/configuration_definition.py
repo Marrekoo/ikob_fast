@@ -415,6 +415,12 @@ def transfer_to_chains_tab(config):
     for key in ["ketens"]:
         config[group][translation[key]] = config["project"].pop(key)
 
+    # Add missing bestemmingslijst entry.
+    config[group]["bestemmingslijst"] = {
+        "gebruiken": False,
+        "bestand": "",
+    }
+
     return config
 
 
