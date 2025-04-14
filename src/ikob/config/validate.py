@@ -109,6 +109,8 @@ def validateConfigWithTemplate(config, template, strict=False):
                False - Configuratie klopt niet.
     """
     templatekeys = [key for key in template.keys() if key != "label"]
+    if not isinstance(config, dict):
+        return False
     if strict and set(config.keys()) != set(templatekeys):
         return False
     for key in templatekeys:

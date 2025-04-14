@@ -1,5 +1,6 @@
 import json
 import pathlib
+
 import pytest
 
 from ikob.configuration_definition import try_fix_incompatible_configuration, validate_config
@@ -33,9 +34,9 @@ old_config = """
     "motieven": [
       "werk"
     ],
-    "fiets of E-fiets": {
-        "E-fiets": false
-    },
+    "fiets of E-fiets": [
+        "Fiets"
+    ],
     "ketens": {
       "gebruiken": false,
       "bestand": "",

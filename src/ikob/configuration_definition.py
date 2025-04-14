@@ -366,7 +366,11 @@ def try_fix_incompatible_configuration(config):
     Some configuration changes can be automatically resolved to
     maintain backward compatibility.
     """
-    fixers = [transfer_to_advanced_tab, transfer_to_chains_tab]
+    fixers = [
+        transfer_to_advanced_tab,
+        transfer_to_chains_tab,
+        fiets_checklist_to_checkbox,
+    ]
 
     for fixer in fixers:
         config = fixer(config)
@@ -425,6 +429,26 @@ def transfer_to_chains_tab(config):
         "bestand": "",
     }
 
+    return config
+
+
+def fiets_checklist_to_checkbox(config):
+    """Update decremented fiets checklist into checkbox."""
+
+    fiets_of_efiets = config["project"]["fiets of E-fiets"]
+    is_deprecated = isinstance(fiets_of_efiets, list)
+
+    if not is_deprecated:
+        return config
+
+    # Since chancing the configuration from a checklist into a
+    # checkbox, selecting multiple entries are no longer supported,
+    # so multiple entries are not attempted to be fixed.
+    if len(fiets_of_efiets) > 1:
+        return config
+
+    is_enabled = fiets_of_efiets == ["E-fiets"]
+    config["project"]["fiets of E-fiets"] = {"E-fiets": is_enabled}
     return config
 
 
