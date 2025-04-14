@@ -379,15 +379,17 @@ def transfer_to_advanced_tab(config):
 
     Introduced in commit `6c6684c`.
     """
-    if "geavanceerd" in config:
-        # Cannot fix: advanced already present.
-        return config
-
     msg = 'Trying to auto fix "geavanceerd" configuration entry.'
     logger.warning(msg)
 
-    config["geavanceerd"] = {}
+    # There is nothing to fix if the deprecated key is not present.
+    if "verdeling" not in config:
+        return config
+
     for key in ["kunstmab", "parkeerkosten", "additionele_kosten"]:
+        if key not in config["verdeling"]:
+            continue
+
         config["geavanceerd"][key] = config["verdeling"].pop(key)
 
     return config
