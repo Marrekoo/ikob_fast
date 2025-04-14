@@ -209,7 +209,7 @@ def competition(config,
         'Fiets',
         'Auto',
         'OV',
-        'Auto-Fiets'
+        'Auto-Fiets',
         'OV_Fiets',
         'Auto_OV',
         'Auto_OV_Fiets']
