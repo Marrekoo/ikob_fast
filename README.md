@@ -12,16 +12,12 @@ So, the further away an amenity (like a job location) is, the less it will count
 
 The next section illustrates two approaches of setting up IKOB on your machine.
 The first method relies on helper scripts provided in [`scripts`](scripts/),
-while the second method follows a manual installation approach. 
+while the second method follows a manual installation approach.
 
 > [!IMPORTANT]
 > Before proceeding make sure [Python](https://www.python.org/) is installed on the system.
-> IKOB supports versions 3.12.x and 3.13.1 (or newer).
+> IKOB supports versions 3.13.1 and newer.
 > For Windows users relying on Python installers, make sure to enable the checkbox `"Add python.exe to PATH"` during installation.
-
-> [!CAUTION]
-> There is a known issue when working with Python version **3.13.0** (see [#74](https://github.com/Stichting-CROW/ikob/issues/74)).
-> Users should therefore use for versions **3.12.x** or **>= 3.13.1**.
 
 ### Using helper scripts
 
