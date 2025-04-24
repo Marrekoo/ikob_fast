@@ -238,7 +238,7 @@ def competition(
                         )
                         reach = origins.get(key)
 
-                        competition_total = np.zeros(len(places_of_employment))
+                        competition_total = np.zeros(len(citizens_or_places_of_employment))
 
                         for i_group, group in enumerate(groups):
                             distribution = distribution_matrix[:, i_group]
@@ -307,12 +307,12 @@ def competition(
                         general_matrix.append(competitions.get(key))
                         general_totals_transpose = utils.transpose(general_matrix)
 
-                    for i in range(len(citizens_per_class)):
+                    for i in range(len(citizens_or_places_of_employment)):
                         general_matrix_product.append([])
-                        for j in range(len(citizens_per_class[0])):
-                            if citizens_per_class[i][j] > 0:
+                        for j in range(len(citizens_or_places_of_employment[0])):
+                            if citizens_or_places_of_employment[i][j] > 0:
                                 general_matrix_product[i].append(
-                                    general_totals_transpose[i][j] * citizens_per_class[i][j]
+                                    general_totals_transpose[i][j] * citizens_or_places_of_employment[i][j]
                                 )
                             else:
                                 general_matrix_product[i].append(0)
