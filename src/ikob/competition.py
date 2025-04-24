@@ -205,6 +205,11 @@ def competition(
     subtopic_competition = "inwoners" if citizens else "arbeidsplaatsen"
     competitions = DataSource(config, DataType.COMPETITION)
 
+    if citizens:
+        citizens_or_places_of_employment = citizens_per_class
+    else:
+        citizens_or_places_of_employment = places_of_employment
+
     for car_possession_group in car_possession_groups:
         for motive in motives:
             if motive == "werk":
@@ -221,6 +226,7 @@ def competition(
             for part_of_day in part_of_days:
                 for i_income_group, income_group in enumerate(income_groups):
                     general_possibility_totals = []
+
                     for modality in modalities:
                         key = DataKey(
                             "Totaal",
@@ -233,11 +239,8 @@ def competition(
                         reach = origins.get(key)
 
                         competition_total = np.zeros(len(places_of_employment))
+
                         for i_group, group in enumerate(groups):
-                            if citizens:
-                                citizens_or_places_of_employment = citizens_per_class.T[i_income_group]
-                            else:
-                                citizens_or_places_of_employment = places_of_employment.T[i_income_group]
                             distribution = distribution_matrix[:, i_group]
                             income_distribution = income_distributions[:, i_income_group]
 
@@ -258,7 +261,7 @@ def competition(
                                 )
 
                                 competition = matrix @ (
-                                    citizens_or_places_of_employment / np.where(reach > 0, reach, 1.0)
+                                    citizens_or_places_of_employment.T[i_income_group] / np.where(reach > 0, reach, 1.0)
                                 )
                                 competition_total += (
                                     competition
