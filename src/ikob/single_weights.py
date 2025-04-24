@@ -42,7 +42,7 @@ def calculate_single_weights(config, generalised_travel_time: DataSource) -> Dat
     # Vaste waarden
     incomes = ["hoog", "middelhoog", "middellaag", "laag"]
     preferences = ["Auto", "Neutraal", "Fiets", "OV"]
-    modalities_bike = project_config["fiets of E-fiets"]
+    modalities_bike = ["E-fiets"] if project_config["fiets of E-fiets"]["E-fiets"] else ["Fiets"]
     fuel_kinds = ["fossiel", "elektrisch"]
 
     weights = DataSource(config, DataType.WEIGHTS)

@@ -72,9 +72,9 @@
     "motieven": [
       "werk"
     ],
-    "fiets of E-fiets": [
-        "Fiets"
-    ],
+    "fiets of E-fiets": {
+        "E-fiets": false
+    },
     "beprijzingsregime": "Basis"
   },
   "geavanceerd": {
@@ -97,6 +97,7 @@
   "ketens": {
     "chains": {
       "gebruiken": false,
+      "bestand": "",
       "naam hub": ""
     },
     "bestemmingslijst": {

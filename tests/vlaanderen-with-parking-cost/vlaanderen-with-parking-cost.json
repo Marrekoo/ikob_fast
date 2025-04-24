@@ -25,9 +25,9 @@
     "motieven": [
       "werk"
     ],
-    "fiets of E-fiets": [
-        "Fiets"
-    ],
+    "fiets of E-fiets": {
+        "E-fiets": false
+    },
     "welke_inkomensgroepen": [
       "laag",
       "middellaag",
@@ -97,6 +97,7 @@
   "ketens": {
     "chains": {
       "gebruiken": false,
+      "bestand": "",
       "naam hub": ""
     },
     "bestemmingslijst": {

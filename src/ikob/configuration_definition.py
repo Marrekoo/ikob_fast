@@ -28,8 +28,9 @@ def config_item(
         default = default_values.get(data_type, default)
 
     # The default value is expected as list when more items are present.
-    if items and isinstance(default, str):
-        default = [default]
+    if data_type != DataType.CHOICE:
+        if items and isinstance(default, str):
+            default = [default]
 
     dictionary = {"label": label, "type": data_type.value, "default": default}
 
@@ -71,12 +72,13 @@ def default_project_tab():
             default="werk",
             items=["werk", "winkeldagelijkszorg", "winkelnietdagelijksonderwijs", "sociaal-recreatief"],
         ),
-        "fiets of E-fiets": config_item(
-            "Rekenen met fiets of E-fiets (slechts één aanklikken)",
-            DataType.CHECKLIST,
-            default="Fiets",
-            items=["Fiets", "E-fiets"],
-        ),
+        "fiets of E-fiets": {
+            "label": "Rekenen met Fiets of E-fiets",
+            "E-fiets": config_item(
+                "Met E-fiets",
+                DataType.CHECKBOX,
+            ),
+        },
         "welke_inkomensgroepen": config_item(
             "Welke inkomensgroepen moeten worden meegenomen",
             DataType.CHECKLIST,
@@ -364,7 +366,11 @@ def try_fix_incompatible_configuration(config):
     Some configuration changes can be automatically resolved to
     maintain backward compatibility.
     """
-    fixers = [transfer_to_advanced_tab, transfer_to_chains_tab]
+    fixers = [
+        transfer_to_advanced_tab,
+        transfer_to_chains_tab,
+        fiets_checklist_to_checkbox,
+    ]
 
     for fixer in fixers:
         config = fixer(config)
@@ -379,15 +385,17 @@ def transfer_to_advanced_tab(config):
 
     Introduced in commit `6c6684c`.
     """
-    if "geavanceerd" in config:
-        # Cannot fix: advanced already present.
-        return config
-
     msg = 'Trying to auto fix "geavanceerd" configuration entry.'
     logger.warning(msg)
 
-    config["geavanceerd"] = {}
+    # There is nothing to fix if the deprecated key is not present.
+    if "verdeling" not in config:
+        return config
+
     for key in ["kunstmab", "parkeerkosten", "additionele_kosten"]:
+        if key not in config["verdeling"]:
+            continue
+
         config["geavanceerd"][key] = config["verdeling"].pop(key)
 
     return config
@@ -415,6 +423,32 @@ def transfer_to_chains_tab(config):
     for key in ["ketens"]:
         config[group][translation[key]] = config["project"].pop(key)
 
+    # Add missing bestemmingslijst entry.
+    config[group]["bestemmingslijst"] = {
+        "gebruiken": False,
+        "bestand": "",
+    }
+
+    return config
+
+
+def fiets_checklist_to_checkbox(config):
+    """Update decremented fiets checklist into checkbox."""
+
+    fiets_of_efiets = config["project"]["fiets of E-fiets"]
+    is_deprecated = isinstance(fiets_of_efiets, list)
+
+    if not is_deprecated:
+        return config
+
+    # Since chancing the configuration from a checklist into a
+    # checkbox, selecting multiple entries are no longer supported,
+    # so multiple entries are not attempted to be fixed.
+    if len(fiets_of_efiets) > 1:
+        return config
+
+    is_enabled = fiets_of_efiets == ["E-fiets"]
+    config["project"]["fiets of E-fiets"] = {"E-fiets": is_enabled}
     return config
 
 

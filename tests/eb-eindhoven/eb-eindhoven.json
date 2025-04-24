@@ -25,6 +25,7 @@
   "ketens": {
     "chains": {
       "gebruiken": false,
+      "bestand": "",
       "naam hub": ""
     },
     "bestemmingslijst": {
@@ -42,9 +43,9 @@
     "motieven": [
       "werk"
     ],
-    "fiets of E-fiets": [
-        "Fiets"
-    ],
+    "fiets of E-fiets": {
+        "E-fiets": false
+    },
     "naam": "EB_Eindhoven_Basis_nw",
     "welke_inkomensgroepen": [
       "laag",
