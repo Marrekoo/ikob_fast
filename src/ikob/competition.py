@@ -8,6 +8,18 @@ from ikob.datasource import DataKey, DataSource, DataType, SegsSource
 logger = logging.getLogger(__name__)
 
 
+def compute_income_distributions(citizens_or_places_of_employment):
+    totals = [sum(row) for row in citizens_or_places_of_employment]
+
+    income_distributions = np.zeros((len(citizens_or_places_of_employment), len(citizens_or_places_of_employment[0])))
+    for i in range(len(citizens_or_places_of_employment)):
+        for j in range(len(citizens_or_places_of_employment[0])):
+            if totals[i] > 0:
+                income_distributions[i][j] = citizens_or_places_of_employment[i][j] / totals[i]
+
+    return income_distributions
+
+
 def get_weight_matrix(
     single_weights: DataSource,
     combined_weights: DataSource,
@@ -194,14 +206,7 @@ def competition(
         citizens_per_class = segs_source.read("Beroepsbevolking_inkomensklasse", scenario=scenario, type_caster=float)
         places_of_employment = segs_source.read("Arbeidsplaatsen_inkomensklasse", scenario=scenario, type_caster=float)
 
-    citizens_totals = [sum(ipk) for ipk in citizens_per_class]
-
-    income_distributions = np.zeros((len(citizens_per_class), len(citizens_per_class[0])))
-    for i in range(len(citizens_per_class)):
-        for j in range(len(citizens_per_class[0])):
-            if citizens_totals[i] > 0:
-                income_distributions[i][j] = citizens_per_class[i][j] / citizens_totals[i]
-
+    income_distributions = compute_income_distributions(citizens_per_class if citizens else places_of_employment)
     subtopic_competition = "inwoners" if citizens else "arbeidsplaatsen"
     competitions = DataSource(config, DataType.COMPETITION)
 
