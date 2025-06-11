@@ -315,7 +315,9 @@ def competition(
                     for i in range(len(citizens_or_places_of_employment)):
                         general_matrix_product.append([])
                         for j in range(len(citizens_or_places_of_employment[0])):
-                            if citizens_or_places_of_employment[i][j] > 0:
+                            if (citizens and (places_of_employment[i][j] > 0)) or (
+                                (not citizens) and (citizens_per_class[i, j] > 0)
+                            ):
                                 general_matrix_product[i].append(
                                     general_totals_transpose[i][j] * citizens_or_places_of_employment[i][j]
                                 )
