@@ -172,8 +172,22 @@ class ConfigApp(Tk):
                 messagebox.showerror(title="Fout", message="Het bestand kan niet worden geladen.")
 
 
-def main(verbose=False):
-    if verbose:
+def main():
+    parser = argparse.ArgumentParser(prog="ikobrunner", description="Launch the IKOB runner GUI.")
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Display logging messages over stdout.",
+    )
+    parser.add_argument(
+        "-p",
+        "--project",
+        help="Optional path to the project to execute. No Gui is shown if provided, and every ikob step is executed.",
+    )
+    args = parser.parse_args()
+
+    if args.verbose:
         logging.basicConfig(
             stream=sys.stdout, level=logging.INFO, format="%(asctime)s - %(levelname)s - %(name)s \t -  %(message)s"
         )
@@ -190,18 +204,4 @@ def main(verbose=False):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(prog="ikobrunner", description="Launch the IKOB runner GUI.")
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        help="Display logging messages over stdout.",
-    )
-    parser.add_argument(
-        "-p",
-        "--project",
-        help="Optional path to the project to execute. No Gui is shown if provided, and every ikob step is executed.",
-    )
-    args = parser.parse_args()
-
-    main(args.verbose)
+    main()

@@ -151,8 +151,17 @@ class ConfigApp(tk.Tk):
             messagebox.showinfo(title="Opgeslagen", message="Configuratie opgeslagen.")
 
 
-def main(verbose=False):
-    if verbose:
+def main():
+    parser = argparse.ArgumentParser(prog="ikobconfig", description="Launch the IKOB config GUI.")
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Display logging messages over stdout.",
+    )
+    args = parser.parse_args()
+
+    if args.verbose:
         logging.basicConfig(
             stream=sys.stdout, level=logging.INFO, format="%(asctime)s - %(levelname)s - %(name)s -  %(message)s"
         )
@@ -168,13 +177,4 @@ def main(verbose=False):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(prog="ikobconfig", description="Launch the IKOB config GUI.")
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        help="Display logging messages over stdout.",
-    )
-    args = parser.parse_args()
-
     main()
