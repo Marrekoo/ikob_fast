@@ -4,7 +4,7 @@ import pathlib
 import pytest
 
 from ikob.configuration_definition import try_fix_incompatible_configuration, validate_config
-from ikob.ikobconfig import loadConfig
+from ikob.ikobconfig import load_config
 
 old_config = """
 {
@@ -127,7 +127,7 @@ def test_load_fixable_config(tmpdir):
     tmpdir = pathlib.Path(tmpdir)
     config_file = tmpdir / "test.json"
     config_file.write_text(old_config)
-    loadConfig(config_file)
+    load_config(config_file)
 
 
 @pytest.mark.parametrize(
@@ -140,7 +140,7 @@ def test_load_fixable_config(tmpdir):
 def test_detect_invalid_choice(tmpdir, gui_tab, key, item, invalid_value):
     # Assert the original file loads properly.
     filename = pathlib.Path("tests/vlaanderen/vlaanderen.json")
-    _ = loadConfig(filename)
+    _ = load_config(filename)
 
     # Insert invalid entries.
     config = json.loads(filename.read_text())
@@ -152,4 +152,4 @@ def test_detect_invalid_choice(tmpdir, gui_tab, key, item, invalid_value):
 
     # Loading with an invalid entry should fail.
     with pytest.raises(ValueError):
-        loadConfig(tmpfile)
+        load_config(tmpfile)

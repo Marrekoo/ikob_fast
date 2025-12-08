@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 def distribute_over_groups(config):
-    logger.info("Verdeling van de groepen over de buurten of zones")
+    logger.info("Starting step: Distribute groups over zones")
 
     project_config = config["project"]
     verdeling_config = config["verdeling"]
@@ -30,17 +30,17 @@ def distribute_over_groups(config):
     segs_source = SegsSource(config)
 
     car_possessions_per_household_segs = segs_source.read("CBS_autos_per_huishouden")
-    urbanisation_grade_segs = segs_source.read("Stedelijkheidsgraad")
+    urbanization_grade_segs = segs_source.read("Stedelijkheidsgraad")
     # Decrement one to account for zero-based indexing later on.
-    urbanisation = [int(sgg) - 1 for sgg in urbanisation_grade_segs]
+    urbanization = [int(sgg) - 1 for sgg in urbanization_grade_segs]
 
     free_car_per_income = [0, 0.02, 0.175, 0.275]
     min_car_possession = car_possessions_per_household_segs
 
     if artificial:
-        artifical_car_possession_segs = read_csv_from_config(config, key="geavanceerd", id="kunstmab", type_caster=int)
+        artificial_car_possession_segs = read_csv_from_config(config, key="geavanceerd", id="kunstmab", type_caster=int)
         min_car_possession = list(
-            itertools.starmap(min, zip(car_possessions_per_household_segs, artifical_car_possession_segs))
+            itertools.starmap(min, zip(car_possessions_per_household_segs, artificial_car_possession_segs))
         )
 
     # Read SEGS input files.
@@ -98,7 +98,7 @@ def distribute_over_groups(config):
             total_car_possession_survey.append([])
             survey_per_income_class.append([])
             car_possession_share = []
-            for id, wc in zip(income_distribution, with_car_segs[urbanisation[i]]):
+            for id, wc in zip(income_distribution, with_car_segs[urbanization[i]]):
                 car_possession_share.append(id * wc / 100)
             car_possession_shares = sum(car_possession_share)
 
@@ -110,18 +110,17 @@ def distribute_over_groups(config):
 
             # Car possessions, license possessions, income classes.
             for i_income in range(len(income_levels)):
-                with_car_share_theoretical = with_car_segs[urbanisation[i]][i_income] / 100
+                with_car_share_theoretical = with_car_segs[urbanization[i]][i_income] / 100
                 with_car = with_car_share_theoretical * car_possession_correction
                 if car_possession_correction != 1:
                     no_car_correction = (1 - with_car) / (1 - with_car_share_theoretical)
                 else:
                     no_car_correction = 1
 
-                no_car_with_license = no_car_segs[urbanisation[i]][i_income] / 100 * no_car_correction
-                no_license = no_license_segs[urbanisation[i]][i_income] / 100 * no_car_correction
+                no_car_with_license = no_car_segs[urbanization[i]][i_income] / 100 * no_car_correction
+                no_license = no_license_segs[urbanization[i]][i_income] / 100 * no_car_correction
 
-                # Van de auto's de gratisauto's en gratisauto en OV-bepalen en
-                # de rest overhouden
+                # Van de auto's de gratisauto's en gratisauto en OV-bepalen en de rest overhouden
 
                 income_share = income_distribution[i_income]
 
@@ -140,10 +139,10 @@ def distribute_over_groups(config):
                 survey_per_income_class[i].append(free_pt_share / with_car)
 
                 for i_preference in range(len(preferences)):
-                    share_perference = (
-                        no_free_car * (1 - free_pt_percentage) * preferences_segs[urbanisation[i]][i_preference] / 100
+                    share_preference = (
+                        no_free_car * (1 - free_pt_percentage) * preferences_segs[urbanization[i]][i_preference] / 100
                     )
-                    preference_share = share_perference * income_share
+                    preference_share = share_preference * income_share
                     total_survey[i].append(preference_share)
                     survey_per_income_class[i].append(preference_share / with_car)
 
@@ -152,13 +151,13 @@ def distribute_over_groups(config):
                 survey_per_income_class[i].append(0)
 
                 for i_preference in range(len(preferences_no_car)):
-                    share_perference = (
+                    share_preference = (
                         no_car_with_license
                         * (1 - free_pt_percentage)
-                        * preferences_no_car_segs[urbanisation[i]][i_preference]
+                        * preferences_no_car_segs[urbanization[i]][i_preference]
                         / 100
                     )
-                    preference_share = share_perference * income_share
+                    preference_share = share_preference * income_share
                     total_survey[i].append(preference_share)
                     survey_per_income_class[i].append(0)
 
@@ -167,13 +166,13 @@ def distribute_over_groups(config):
                 survey_per_income_class[i].append(0)
 
                 for i_preference in range(len(preferences_no_car)):
-                    share_perference = (
+                    share_preference = (
                         no_license
                         * (1 - free_pt_percentage)
-                        * preferences_no_car_segs[urbanisation[i]][i_preference]
+                        * preferences_no_car_segs[urbanization[i]][i_preference]
                         / 100
                     )
-                    preference_share = share_perference * income_share
+                    preference_share = share_preference * income_share
                     total_survey[i].append(preference_share)
                     survey_per_income_class[i].append(0)
 

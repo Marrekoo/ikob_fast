@@ -8,9 +8,13 @@ from typing import Optional
 from numpy.typing import NDArray
 
 import ikob.utils as utils
-from ikob.urbanisation_grade_to_parking_times import urbanisation_grade_to_parking_times
+from ikob.urbanization_grade_to_parking_times import urbanization_grade_to_parking_times
 
 logger = logging.getLogger(__name__)
+
+
+class DataSourceError(Exception):
+    pass
 
 
 def get_project_name(config) -> str:
@@ -34,8 +38,18 @@ def read_csv_from_config(config, key: str, id: str, type_caster=float):
     if isinstance(csv_path, dict):
         csv_path = csv_path["bestand"]
 
+    if csv_path == "":
+        raise DataSourceError(
+            f"Problem occurred while reading path from config with key: '{key}' and id '{id}'. Path is empty"
+        )
+
     csv_path = pathlib.Path(csv_path)
-    return utils.read_csv(csv_path, type_caster)
+    try:
+        return utils.read_csv(csv_path, type_caster)
+    except Exception:
+        raise DataSourceError(
+            f"Problem occurred while reading path from config with key: '{key}' and id '{id}'. Path is '{csv_path}'"
+        )
 
 
 def read_parking_times(config):
@@ -51,33 +65,35 @@ def read_parking_times(config):
     parking_time_path = pathlib.Path(config_skims.get("parkeerzoektijden_bestand", segs_dir / "Parkeerzoektijd.csv"))
 
     if parking_time_path.exists():
-        logging.info("Reading parking times: '%s'", parking_time_path)
+        logging.info("Reading parking times from: '%s'", parking_time_path)
         return utils.read_csv_int(parking_time_path)
 
-    urbanisation_path = segs_dir / "Stedelijkheidsgraad.csv"
-    assert urbanisation_path.exists(), (
+    urbanization_path = segs_dir / "Stedelijkheidsgraad.csv"
+    assert urbanization_path.exists(), (
         "Missing both Parkeerzoektijden, Stedelijkheidsgraad files.Parkeerzoektijden file cannot be generated."
     )
 
     msg = "Generating parking times from '%s'"
-    logger.info(msg, urbanisation_path)
-    urbanisation_grade = utils.read_csv_int(urbanisation_path)
-    return urbanisation_grade_to_parking_times(urbanisation_grade)
+    logger.info(msg, urbanization_path)
+    urbanization_grade = utils.read_csv_int(urbanization_path)
+    return urbanization_grade_to_parking_times(urbanization_grade)
 
 
 class SkimsSource:
     """A data provider for skims files."""
 
     def __init__(self, skims_dir: pathlib.Path | str):
+        if skims_dir == "":
+            raise DataSourceError("Skims source initialized with empty skims dir")
         self.skims_dir = pathlib.Path(skims_dir)
 
-    def read(self, id: str, dagsoort: str, type_caster=float):
+    def read(self, id: str, dag_deel: str, type_caster=float):
         """Read skims from disk.
 
-        Reads the skim file formed by the identifier and dagsoort.
+        Reads the skim file formed by the identifier and dag deel.
         The ``type_caster`` allows to cast the data to a desired type.
         """
-        path = (self.skims_dir / dagsoort / id).with_suffix(".csv")
+        path = (self.skims_dir / dag_deel / id).with_suffix(".csv")
         return utils.read_csv(path, type_caster=type_caster)
 
 
@@ -86,6 +102,8 @@ class SegsSource:
 
     def __init__(self, config):
         self.segs_dir = pathlib.Path(config["project"]["paden"]["segs_directory"])
+        if self.segs_dir == "":
+            raise DataSourceError("Skims source initialized with empty skims dir")
         self.tmp_dir = get_temporary_directory(config)
 
     def _segs_input_dir(self, id, jaar, scenario):
@@ -110,7 +128,7 @@ class SegsSource:
         # TODO: This is a temporary fix. The 'Verdeling_over_groepen*'
         # files are written to disk as SEGS files. These were originally
         # written back into the _input_ directory and read out in later
-        # stages of the program. This detects that behaviour and diverts
+        # stages of the program. This detects that behavior and diverts
         # reading to the SEGS _output_ directory. Since this only happens
         # for one variable, the fix is introduced here. Once that data is
         # passed along as function arguments (kept in memory), this TODO
@@ -123,7 +141,12 @@ class SegsSource:
             path = self._segs_input_dir(id, jaar, scenario)
 
         path = path.with_suffix(".csv")
-        return utils.read_csv(path, type_caster=type_caster)
+        try:
+            return utils.read_csv(path, type_caster=type_caster)
+        except FileNotFoundError:
+            raise DataSourceError(
+                f"File SEGS file '{path}' not found. Is the scenario (used as subfolder) '{scenario}' correct?"
+            )
 
     def write_csv(self, data, id, header, group="", jaar="", modifier="", scenario=""):
         path = self._segs_output_dir(id, jaar, scenario, group, modifier).with_suffix(".csv")
@@ -137,7 +160,7 @@ class SegsSource:
 class DataType(enum.Enum):
     DESTINATIONS = "bestemmingen"
     COMPETITION = "concurrentie"
-    GENERALISED_TRAVEL_TIME = "ervarenreistijd"
+    GENERALIZED_TRAVEL_TIME = "ervarenreistijd"
     WEIGHTS = "gewichten"
     ORIGINS = "herkomsten"
     POTENCY = "potenties"
@@ -186,7 +209,7 @@ class DataSource:
     def _make_file_path(self, key: DataKey) -> pathlib.Path:
         base = self._get_base_dir(key)
         id_with_suffix = self._add_id_suffix(key)
-        dagsoort = key.part_of_day.lower()
+        dag_deel = key.part_of_day.lower()
         regime = key.regime.lower()
         path = (
             self.project_dir
@@ -196,7 +219,7 @@ class DataSource:
             / key.group
             / self.datatype.value
             / key.subtopic
-            / dagsoort
+            / dag_deel
             / key.fuel_kind
         )
         os.makedirs(path, exist_ok=True)

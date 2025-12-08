@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 def deployment_opportunities(config, single_weights: DataSource, combined_weights: DataSource) -> DataSource:
-    logger.info("Deployment opportunities for citizens.")
+    logger.info("Starting step: Deployment opportunities for citizens.")
 
     project_config = config["project"]
     skims_config = config["skims"]

@@ -3,8 +3,8 @@ import pathlib
 
 from test_end_to_end import compare_directories, remove_directory
 
-from ikob.group_distribution import distribute_over_groups
-from ikob.ikobconfig import getConfigFromArgs
+from ikob.distribute_over_groups import distribute_over_groups
+from ikob.ikobconfig import get_config_from_args
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ def test_group_distribution():
     """
     case = "eb-eindhoven"
     project_dir = pathlib.Path(f"tests/{case}/")
-    config = getConfigFromArgs(project_dir / f"{case}.json")
+    config = get_config_from_args(project_dir / f"{case}.json")
 
     distribute_over_groups(config)
 

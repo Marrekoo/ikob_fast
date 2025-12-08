@@ -18,7 +18,7 @@ def create_citizens_file(distribution_matrix, working_population):
 
 
 def potential_companies(config, single_weights: DataSource, combined_weights: DataSource) -> DataSource:
-    logger.info("Possibilities for companies and institutes.")
+    logger.info("Starting step: Possibilities for companies and institutes.")
 
     project_config = config["project"]
     skims_config = config["skims"]

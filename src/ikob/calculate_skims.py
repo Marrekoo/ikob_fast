@@ -1,13 +1,12 @@
 import os
 
-from ikobconfig import getConfigFromArgs
-
 import ikob.utils as utils
+from ikob.ikobconfig import get_config_from_args
 
 # Deze routine kijkt naar de command-line en leest
 # het opgegeven configuratie bestand in een dict.
 # Indien er een probleem is, sluit het script hier af.
-config = getConfigFromArgs()
+config = get_config_from_args()
 # nieuw automatisch toegevoegd config item.
 Projectbestandsnaam = config["__filename__"]
 

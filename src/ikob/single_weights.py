@@ -9,15 +9,15 @@ from ikob.datasource import DataKey, DataSource, DataType
 logger = logging.getLogger(__name__)
 
 
-def calculate_weights(generalised_travel_time, modality, preference, motive):
+def calculate_weights(generalized_travel_time, modality, preference, motive):
     alpha, omega, scaling = work_constants(modality, preference, motive)
-    n = len(generalised_travel_time)
+    n = len(generalized_travel_time)
     weight_matrix = np.zeros((n, n))
 
-    for r in range(len(generalised_travel_time)):
-        for k in range(len(generalised_travel_time)):
-            if generalised_travel_time[r][k] < 180:
-                travel_time = (1.0 / (1 + math.exp((-omega + generalised_travel_time[r][k]) * alpha))) * scaling
+    for r in range(len(generalized_travel_time)):
+        for k in range(len(generalized_travel_time)):
+            if generalized_travel_time[r][k] < 180:
+                travel_time = (1.0 / (1 + math.exp((-omega + generalized_travel_time[r][k]) * alpha))) * scaling
             else:
                 travel_time = 0.0
 
@@ -28,8 +28,8 @@ def calculate_weights(generalised_travel_time, modality, preference, motive):
     return weight_matrix
 
 
-def calculate_single_weights(config, generalised_travel_time: DataSource) -> DataSource:
-    logger.info("Weights (travel time decay curves) for car, PT, bike, and E-bike.")
+def calculate_single_weights(config, generalized_travel_time: DataSource) -> DataSource:
+    logger.info("Starting step: Weights (travel time decay curves) for car, PT, bike, and E-bike.")
 
     project_config = config["project"]
     skims_config = config["skims"]
@@ -53,7 +53,7 @@ def calculate_single_weights(config, generalised_travel_time: DataSource) -> Dat
                 for preference in preferences:
                     if preference == "Auto" or preference == "Fiets":
                         key = DataKey("Fiets", part_of_day=part_of_day, regime=regimes, motive=motive)
-                        ggr_skim = generalised_travel_time.get(key)
+                        ggr_skim = generalized_travel_time.get(key)
                         weight_matrix = calculate_weights(ggr_skim, modality, preference, motive)
 
                         if preference == "Auto":
@@ -76,7 +76,7 @@ def calculate_single_weights(config, generalised_travel_time: DataSource) -> Dat
                         key = DataKey(
                             f"Auto_{fuel_kind}", part_of_day=part_of_day, income=income, regime=regimes, motive=motive
                         )
-                        ggr_skim = generalised_travel_time.get(key)
+                        ggr_skim = generalized_travel_time.get(key)
 
                         weight_matrix = calculate_weights(ggr_skim, "Auto", preference, motive)
                         key = DataKey(
@@ -98,7 +98,7 @@ def calculate_single_weights(config, generalised_travel_time: DataSource) -> Dat
                         key = DataKey(
                             f"{no_car_kind}", part_of_day=part_of_day, income=income, regime=regimes, motive=motive
                         )
-                        ggr_skim = generalised_travel_time.get(key)
+                        ggr_skim = generalized_travel_time.get(key)
 
                         weight_matrix = calculate_weights(ggr_skim, "Auto", preference, motive)
                         key = DataKey(
@@ -118,7 +118,7 @@ def calculate_single_weights(config, generalised_travel_time: DataSource) -> Dat
                         key = DataKey(
                             f"{modality}", part_of_day=part_of_day, income=income, regime=regimes, motive=motive
                         )
-                        ggr_skim = generalised_travel_time.get(key)
+                        ggr_skim = generalized_travel_time.get(key)
 
                         weight_matrix = calculate_weights(ggr_skim, modality, preference, motive)
                         key = DataKey(
@@ -133,7 +133,7 @@ def calculate_single_weights(config, generalised_travel_time: DataSource) -> Dat
 
             for income in incomes:
                 key = DataKey("GratisAuto", part_of_day=part_of_day, income=income, regime=regimes, motive=motive)
-                ggr_skim = generalised_travel_time.get(key)
+                ggr_skim = generalized_travel_time.get(key)
 
                 weight_matrix = calculate_weights(ggr_skim, "Auto", "Auto", motive)
                 special_car_kinds = ["Neutraal", "Auto"]
@@ -149,7 +149,7 @@ def calculate_single_weights(config, generalised_travel_time: DataSource) -> Dat
                     weights.set(key, weight_matrix.copy())
 
                 key = DataKey("GratisOV", part_of_day=part_of_day, regime=regimes, motive=motive)
-                ggr_skim = generalised_travel_time.get(key)
+                ggr_skim = generalized_travel_time.get(key)
 
                 weight_matrix = calculate_weights(ggr_skim, "OV", "OV", motive)
                 special_pt_kinds = ["Neutraal", "OV"]
