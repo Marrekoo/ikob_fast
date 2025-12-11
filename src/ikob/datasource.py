@@ -87,13 +87,13 @@ class SkimsSource:
             raise DataSourceError("Skims source initialized with empty skims dir")
         self.skims_dir = pathlib.Path(skims_dir)
 
-    def read(self, id: str, dag_deel: str, type_caster=float):
+    def read(self, id: str, dagdeel: str, type_caster=float):
         """Read skims from disk.
 
-        Reads the skim file formed by the identifier and dag deel.
+        Reads the skim file formed by the identifier and dagdeel.
         The ``type_caster`` allows to cast the data to a desired type.
         """
-        path = (self.skims_dir / dag_deel / id).with_suffix(".csv")
+        path = (self.skims_dir / dagdeel / id).with_suffix(".csv")
         return utils.read_csv(path, type_caster=type_caster)
 
 
@@ -209,7 +209,7 @@ class DataSource:
     def _make_file_path(self, key: DataKey) -> pathlib.Path:
         base = self._get_base_dir(key)
         id_with_suffix = self._add_id_suffix(key)
-        dag_deel = key.part_of_day.lower()
+        dagdeel = key.part_of_day.lower()
         regime = key.regime.lower()
         path = (
             self.project_dir
@@ -219,7 +219,7 @@ class DataSource:
             / key.group
             / self.datatype.value
             / key.subtopic
-            / dag_deel
+            / dagdeel
             / key.fuel_kind
         )
         os.makedirs(path, exist_ok=True)
