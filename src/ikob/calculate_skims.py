@@ -175,34 +175,34 @@ for ds in dagsoort:
 
     # Eerst de fiets:
 
-    GGRskim = []
+    GTRskim = []
     aantal_zones_fiets = len(Fietstijdmatrix)
     for i in range(0, aantal_zones_fiets):
-        GGRskim.append([])
+        GTRskim.append([])
         for j in range(0, aantal_zones_fiets):
             if Fietstijdmatrix[i][j] < 180:
-                GGRskim[i].append(int(Fietstijdmatrix[i][j]))
+                GTRskim[i].append(int(Fietstijdmatrix[i][j]))
             else:
-                GGRskim[i].append(9999)
+                GTRskim[i].append(9999)
         for j in range(aantal_zones_fiets, aantal_zones):
-            GGRskim[i].append(9999)
+            GTRskim[i].append(9999)
     for i in range(aantal_zones_fiets, aantal_zones):
-        GGRskim.append([])
+        GTRskim.append([])
         for j in range(0, aantal_zones):
-            GGRskim[i].append(9999)
+            GTRskim[i].append(9999)
 
     Uitvoerfilenaam = os.path.join(Uitvoerdirectory, "Fiets")
-    utils.write_csv(GGRskim, Uitvoerfilenaam)
+    utils.write_csv(GTRskim, Uitvoerfilenaam)
 
     for ink in inkomens:
-        GGRskim = []
+        GTRskim = []
         Vermenigvuldigingsfactor = TVOMwerk.get(ink)
         for i in range(0, aantal_zones):
-            GGRskim.append([])
+            GTRskim.append([])
             for j in range(0, aantal_zones):
                 totaleTijd = Autotijdmatrix[i][j] + float(Parkeertijdlijst[i][1]) + float(Parkeertijdlijst[j][2])
                 if Additionele_kosten:
-                    GGRskim[i].append(
+                    GTRskim[i].append(
                         int(
                             totaleTijd
                             + Vermenigvuldigingsfactor
@@ -214,7 +214,7 @@ for ds in dagsoort:
                         )
                     )
                 else:
-                    GGRskim[i].append(
+                    GTRskim[i].append(
                         int(
                             totaleTijd
                             + Vermenigvuldigingsfactor
@@ -223,33 +223,33 @@ for ds in dagsoort:
                     )
 
         Uitvoerfilenaam = os.path.join(Uitvoerdirectory, f"Auto_{ink}")
-        utils.write_csv(GGRskim, Uitvoerfilenaam)
+        utils.write_csv(GTRskim, Uitvoerfilenaam)
 
         # Dan het OV
-        GGRskim = []
+        GTRskim = []
         Vermenigvuldigingsfactor = TVOMwerk.get(ink)
         for i in range(0, aantal_zones):
-            GGRskim.append([])
+            GTRskim.append([])
             for j in range(0, aantal_zones):
                 if float(OVtijdmatrix[i][j]) > 0.5:
                     Resultaat = float(OVtijdmatrix[i][j]) + Vermenigvuldigingsfactor * float(KostenmatrixOV[i][j])
                     Resultaatint = int(Resultaat)
-                    GGRskim[i].append(Resultaatint)
+                    GTRskim[i].append(Resultaatint)
                 else:
-                    GGRskim[i].append(9999)
+                    GTRskim[i].append(9999)
 
         Uitvoerfilenaam = os.path.join(Uitvoerdirectory, f"OV_{ink}")
-        utils.write_csv(GGRskim, Uitvoerfilenaam)
+        utils.write_csv(GTRskim, Uitvoerfilenaam)
 
         # Dan geen auto (rijbewijs)
         for sga in soortgeenauto:
-            GGRskim = []
+            GTRskim = []
             Vermenigvuldigingsfactor = TVOMwerk.get(ink)
             for i in range(0, aantal_zones):
-                GGRskim.append([])
+                GTRskim.append([])
                 for j in range(0, aantal_zones):
                     if Autotijdmatrix[i][j] < 7:
-                        GGRskim[i].append(99999)
+                        GTRskim[i].append(99999)
                     else:
                         totaleTijd = (
                             Autotijdmatrix[i][j] + float(Parkeertijdlijst[i][1]) + float(Parkeertijdlijst[j][2])
@@ -257,21 +257,21 @@ for ds in dagsoort:
                         totaleKosten = Autotijdmatrix[i][j] * tijdkostenga.get(sga) + Autoafstandmatrix[i][j] * (
                             varkostenga.get(sga) + kmheffing
                         )
-                        GGRskim[i].append(int(totaleTijd + Vermenigvuldigingsfactor * totaleKosten))
+                        GTRskim[i].append(int(totaleTijd + Vermenigvuldigingsfactor * totaleKosten))
 
             Uitvoerfilenaam = os.path.join(Uitvoerdirectory, f"{sga}_{ink}")
-            utils.write_csv(GGRskim, Uitvoerfilenaam)
+            utils.write_csv(GTRskim, Uitvoerfilenaam)
 
         # Nu GratisAuto
         for ink in inkomens:
-            GGRskim = []
+            GTRskim = []
             Vermenigvuldigingsfactor = TVOMwerk.get(ink)
             for i in range(0, aantal_zones):
-                GGRskim.append([])
+                GTRskim.append([])
                 for j in range(0, aantal_zones):
                     totaleTijd = Autotijdmatrix[i][j] + float(Parkeertijdlijst[i][1]) + float(Parkeertijdlijst[j][2])
                     if Additionele_kosten:
-                        GGRskim[i].append(
+                        GTRskim[i].append(
                             int(
                                 totaleTijd
                                 + Vermenigvuldigingsfactor * Autoafstandmatrix[i][j] * kmheffing
@@ -280,7 +280,7 @@ for ds in dagsoort:
                             )
                         )
                     else:
-                        GGRskim[i].append(
+                        GTRskim[i].append(
                             int(
                                 totaleTijd
                                 + Vermenigvuldigingsfactor * Autoafstandmatrix[i][j] * kmheffing
@@ -288,32 +288,32 @@ for ds in dagsoort:
                             )
                         )
             Uitvoerfilenaam = os.path.join(Uitvoerdirectory, f"GratisAuto_{ink}")
-            utils.write_csv(GGRskim, Uitvoerfilenaam)
+            utils.write_csv(GTRskim, Uitvoerfilenaam)
 
         # Nu GratisOV
-        GGRskim = []
+        GTRskim = []
         for i in range(0, aantal_zones):
-            GGRskim.append([])
+            GTRskim.append([])
             for j in range(0, aantal_zones):
                 if OVtijdmatrix[i][j] > 0.5:
-                    GGRskim[i].append(int(OVtijdmatrix[i][j]))
+                    GTRskim[i].append(int(OVtijdmatrix[i][j]))
                 else:
-                    GGRskim[i].append(9999)
+                    GTRskim[i].append(9999)
 
         Uitvoerfilenaam = os.path.join(Uitvoerdirectory, "GratisOV")
-        utils.write_csv(GGRskim, Uitvoerfilenaam)
+        utils.write_csv(GTRskim, Uitvoerfilenaam)
 
         # Nu de ketens
         # Eerst P+Fiets
         if Ketens:
             for ink in inkomens:
-                GGRskim = []
+                GTRskim = []
                 Vermenigvuldigingsfactor = TVOMwerk.get(ink)
                 for i in range(0, aantal_zones):
-                    GGRskim.append([])
+                    GTRskim.append([])
                     for j in range(0, aantal_zones):
                         if Additionele_kosten:
-                            GGRskim[i].append(
+                            GTRskim[i].append(
                                 int(
                                     Pplusfietstijdmatrix[i][j]
                                     + Vermenigvuldigingsfactor
@@ -324,7 +324,7 @@ for ds in dagsoort:
                                 )
                             )
                         else:
-                            GGRskim[i].append(
+                            GTRskim[i].append(
                                 int(
                                     Pplusfietstijdmatrix[i][j]
                                     + Vermenigvuldigingsfactor * Pplusfietsafstandmatrix[i][j] * varautotarief
@@ -333,17 +333,17 @@ for ds in dagsoort:
                             )
 
                 Uitvoerfilenaam = os.path.join(Uitvoerdirectory, f"Pplusfiets_{Hubnaam}_{ink}")
-                utils.write_csv(GGRskim, Uitvoerfilenaam)
+                utils.write_csv(GTRskim, Uitvoerfilenaam)
 
                 # Dan P+R
 
-                GGRskim = []
+                GTRskim = []
 
                 for i in range(0, aantal_zones):
-                    GGRskim.append([])
+                    GTRskim.append([])
                     for j in range(0, aantal_zones):
                         if Additionele_kosten:
-                            GGRskim[i].append(
+                            GTRskim[i].append(
                                 int(
                                     PplusRbestemmingstijdmatrix[i][j]
                                     + Vermenigvuldigingsfactor
@@ -355,7 +355,7 @@ for ds in dagsoort:
                                 )
                             )
                         else:
-                            GGRskim[i].append(
+                            GTRskim[i].append(
                                 int(
                                     PplusRbestemmingstijdmatrix[i][j]
                                     + Vermenigvuldigingsfactor
@@ -367,15 +367,15 @@ for ds in dagsoort:
                             )
 
                 Uitvoerfilenaam = os.path.join(Uitvoerdirectory, f"PplusRbestemmings_{Hubnaam}_{ink}")
-                utils.write_csv(GGRskim, Uitvoerfilenaam)
+                utils.write_csv(GTRskim, Uitvoerfilenaam)
 
-                GGRskim = []
+                GTRskim = []
 
                 for i in range(0, aantal_zones):
-                    GGRskim.append([])
+                    GTRskim.append([])
                     for j in range(0, aantal_zones):
                         if Additionele_kosten:
-                            GGRskim[i].append(
+                            GTRskim[i].append(
                                 int(
                                     PplusRherkomsttijdmatrix
                                     + Vermenigvuldigingsfactor
@@ -387,7 +387,7 @@ for ds in dagsoort:
                                 )
                             )
                         else:
-                            GGRskim[i].append(
+                            GTRskim[i].append(
                                 int(
                                     PplusRherkomsttijdmatrix[i][j]
                                     + Vermenigvuldigingsfactor
@@ -399,4 +399,4 @@ for ds in dagsoort:
                             )
 
                 Uitvoerfilenaam = os.path.join(Uitvoerdirectory, f"PplusRherkomst_{Hubnaam}_{ink}")
-                utils.write_csv(GGRskim, Uitvoerfilenaam)
+                utils.write_csv(GTRskim, Uitvoerfilenaam)

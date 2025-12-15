@@ -118,12 +118,12 @@ def generalized_travel_time(config) -> DataSource:
                 )
 
             # Eerst de fiets:
-            ggr_skim = np.where(bike_time_matrix < 180, bike_time_matrix, 9999)
+            gtr_skim = np.where(bike_time_matrix < 180, bike_time_matrix, 9999)
 
             key = DataKey(id="Fiets", part_of_day=pod, regime=regime, motive=motive)
-            generalized_travel_time.set(key, ggr_skim.copy())
+            generalized_travel_time.set(key, gtr_skim.copy())
 
-            ggr_skim = np.zeros((num_zones, num_zones))
+            gtr_skim = np.zeros((num_zones, num_zones))
             for income_level in income_levels:
                 factor = tvom.get(income_level)
 
@@ -138,13 +138,13 @@ def generalized_travel_time(config) -> DataSource:
                         for j in range(num_zones):
                             total_time = car_time_matrix[i][j] + parking_times[i][1] + parking_times[j][2]
                             if additional_costs:
-                                ggr_skim[i][j] = total_time + factor * (
+                                gtr_skim[i][j] = total_time + factor * (
                                     car_distance_matrix[i][j] * (var_car_rate + road_pricing)
                                     + additional_cost_matrix[i][j] / 100
                                     + parking_cost_array[j] / 100
                                 )
                             else:
-                                ggr_skim[i][j] = total_time + factor * (
+                                gtr_skim[i][j] = total_time + factor * (
                                     car_distance_matrix[i][j] * (var_car_rate + road_pricing)
                                     + parking_cost_array[j] / 100
                                 )
@@ -157,8 +157,8 @@ def generalized_travel_time(config) -> DataSource:
                             motive=motive,
                             regime=regime,
                         )
-                        ggr_park_and_bike_skim = generalized_travel_time.get(key)
-                        bestskim = np.minimum(ggr_skim, ggr_park_and_bike_skim)
+                        gtr_park_and_bike_skim = generalized_travel_time.get(key)
+                        bestskim = np.minimum(gtr_skim, gtr_park_and_bike_skim)
                         key = DataKey(
                             id=f"PplusR_{fuel_kind}",
                             part_of_day=pod,
@@ -167,23 +167,23 @@ def generalized_travel_time(config) -> DataSource:
                             motive=motive,
                             regime=regime,
                         )
-                        ggr_park_and_ride_skim = generalized_travel_time.get(key)
-                        ggr_skim = np.minimum(bestskim, ggr_park_and_ride_skim)
+                        gtr_park_and_ride_skim = generalized_travel_time.get(key)
+                        gtr_skim = np.minimum(bestskim, gtr_park_and_ride_skim)
 
                     key = DataKey(
                         id=f"Auto_{fuel_kind}", part_of_day=pod, income=income_level, regime=regime, motive=motive
                     )
-                    generalized_travel_time.set(key, ggr_skim.copy())
+                    generalized_travel_time.set(key, gtr_skim.copy())
 
                 # Dan het OV
                 factor = tvom.get(income_level)
-                ggr_skim = np.where(pt_time_matrix > 0.5, pt_time_matrix + factor * pt_cost_matrix, 9999)
+                gtr_skim = np.where(pt_time_matrix > 0.5, pt_time_matrix + factor * pt_cost_matrix, 9999)
                 key = DataKey(id="OV", part_of_day=pod, income=income_level, motive=motive, regime=regime)
-                generalized_travel_time.set(key, ggr_skim.copy())
+                generalized_travel_time.set(key, gtr_skim.copy())
 
                 # Dan geen auto (rijbewijs)
                 for kind in kind_no_car:
-                    ggr_skim.fill(99999)
+                    gtr_skim.fill(99999)
                     factor = tvom.get(income_level)
                     for i in range(num_zones):
                         for j in range(num_zones):
@@ -191,35 +191,35 @@ def generalized_travel_time(config) -> DataSource:
                             total_cost = car_time_matrix[i][j] * time_costs_no_car.get(kind) + car_distance_matrix[i][
                                 j
                             ] * (costs_no_car.get(kind) + road_pricing)
-                            ggr_skim[i][j] = total_time + factor * total_cost
+                            gtr_skim[i][j] = total_time + factor * total_cost
 
                     key = DataKey(id=f"{kind}", part_of_day=pod, income=income_level, motive=motive, regime=regime)
-                    generalized_travel_time.set(key, ggr_skim.copy())
+                    generalized_travel_time.set(key, gtr_skim.copy())
 
                 # GratisAuto
                 for income_level in income_levels:
-                    ggr_skim.fill(0)
+                    gtr_skim.fill(0)
                     factor = tvom.get(income_level)
                     for i in range(num_zones):
                         for j in range(num_zones):
                             total_time = car_time_matrix[i][j] + parking_times[i][1] + parking_times[j][2]
                             if additional_costs:
-                                ggr_skim[i][j] = total_time + factor * (
+                                gtr_skim[i][j] = total_time + factor * (
                                     car_distance_matrix[i][j] * road_pricing
                                     + additional_cost_matrix[i][j] / 100
                                     + parking_cost_array[j] / 100
                                 )
                             else:
-                                ggr_skim[i][j] = total_time + factor * (
+                                gtr_skim[i][j] = total_time + factor * (
                                     car_distance_matrix[i][j] * road_pricing + parking_cost_array[j] / 100
                                 )
                     key = DataKey(id="GratisAuto", part_of_day=pod, income=income_level, motive=motive, regime=regime)
-                    generalized_travel_time.set(key, ggr_skim.copy())
+                    generalized_travel_time.set(key, gtr_skim.copy())
 
                 # GratisOV
-                ggr_skim = np.where(pt_time_matrix > 0.5, pt_time_matrix, 9999)
+                gtr_skim = np.where(pt_time_matrix > 0.5, pt_time_matrix, 9999)
                 key = DataKey(id="GratisOV", part_of_day=pod, motive=motive, regime=regime)
-                generalized_travel_time.set(key, ggr_skim.copy())
+                generalized_travel_time.set(key, gtr_skim.copy())
 
     return generalized_travel_time
 

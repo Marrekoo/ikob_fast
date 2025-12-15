@@ -8,11 +8,14 @@ This data is used to create accessibility profiles for several groups within soc
 Potential accessibility is calculated in analogy with [Hansen (1958)](https://www.tandfonline.com/doi/abs/10.1080/01944365908978307 "Subscription needed"). It uses distance decay curves for each mode, based on time and cost (perception) by each group in society.
 So, the further away an amenity (like a job location) is, the less it will count as a full option. The calculated potential accessibility, therefore, is a weighted amount.
 
-Some commonly used abbreviations:
-TVOM: time value of money -  how much money a unit of time is worth
-SEGS: ?
-skims: ?
-ggr: ?
+Some commonly used abbreviations / jargon:
+- TVOM: Time value of money, how much money a unit of time is worth.  
+  Used to combine both travel time and travel costs into a single metric.
+- SEGS: Sociaal-economische gegevens (Social-Economic data).  
+  For example: Shops per zone, working population per zone, etc.
+- skims: Data to determine an impedance ('friction') matrix from zone to zone.  
+  For example: A matrix of distances via car from zone to zone, costs per kilometer of traveling by car, etc.
+- GTR: Generalized travel time
 
 ## Installation and usage
 
