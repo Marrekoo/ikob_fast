@@ -99,12 +99,14 @@ def get_weight_matrix(
 def competition_on_jobs(
     config, single_weights: DataSource, combined_weights: DataSource, origins: DataSource
 ) -> DataSource:
+    logger.info("Starting step: Compute competition on jobs")
     return competition(config, single_weights, combined_weights, origins, citizens=False)
 
 
 def competition_on_citizens(
     config, single_weights: DataSource, combined_weights: DataSource, origins: DataSource
 ) -> DataSource:
+    logger.info("Starting step: Compute competition on citizens")
     return competition(config, single_weights, combined_weights, origins, citizens=True)
 
 
@@ -112,7 +114,7 @@ def competition(
     config, single_weights: DataSource, combined_weights: DataSource, origins: DataSource, citizens: bool = True
 ) -> DataSource:
     if citizens:
-        msg = "Competition for companies and accessiblity."
+        msg = "Competition for companies and accessibility."
     else:
         msg = "Competition for places of employment."
     logger.info(msg)

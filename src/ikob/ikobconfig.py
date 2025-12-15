@@ -21,37 +21,37 @@ logger = logging.getLogger(__name__)
 # Interface: load/save config files.
 
 
-def _projectFilename(projectname, make_safe=True):
+def _project_filename(project_name, make_safe=True):
     """
     Doe een 'veilige' suggestie voor een bestandsnaam gebaseerd op een
     door de gebruiker opgegeven naam van een project.
     """
-    filename, ext = os.path.splitext(projectname)
+    filename, ext = os.path.splitext(project_name)
     if ext != ".json":
-        filename = projectname
+        filename = project_name
     if make_safe:
         filename = re.sub(r"[^\w\s]", "", filename)
         filename = re.sub(r"\s+", "_", filename)
     return filename + ".json"
 
 
-def getConfigFromArgs(project=None):
+def get_config_from_args(project=None):
     """
     Leest een configuratiebestand die is opgegeven in de 'command line'.
     Resultaat: Een geldige, ingeladen configuratie.
-    Fouten: IOError - Als het opegeven bestand niet bestaat of niet geopend kon worden.
+    Fouten: IOError - Als het opgegeven bestand niet bestaat of niet geopend kon worden.
             ValueError - Als het opgegeven bestand geen geldige configuratie bevat.
     """
     if project:
-        return loadConfig(project)
+        return load_config(project)
 
     parser = argparse.ArgumentParser()
     parser.add_argument("project", type=str, help="Het .json project bestand.")
     args = parser.parse_args()
-    return loadConfig(args.project)
+    return load_config(args.project)
 
 
-def loadConfig(filename):
+def load_config(filename):
     config = None
     try:
         with open(filename) as json_file:
@@ -69,7 +69,7 @@ def loadConfig(filename):
                 msg = "Automatically recovered from incompatible config file."
                 logger.info(msg)
             else:
-                msg = "Configuration has inrecoverable incompatible format."
+                msg = "Configuration has irrecoverable incompatible format."
                 logger.error(msg)
                 raise ValueError(msg)
 
@@ -104,22 +104,22 @@ class ConfigApp(tk.Tk):
         self._widgets = build.buildTkInterface(
             self,
             self._template,
-            cmdNew=self.cmdNieuwProject,
-            cmdLoad=self.cmdLaadProject,
-            cmdSave=self.cmdOpslaanProject,
+            cmdNew=self.new_project_cmd,
+            cmdLoad=self.load_project_cmd,
+            cmdSave=self.save_project_cmd,
         )
 
-    def cmdNieuwProject(self):
+    def new_project_cmd(self):
         build.setTkVars(self._template, default_config())
 
-    def cmdLaadProject(self):
+    def load_project_cmd(self):
         filename = filedialog.askopenfilename(
             title="Kies een .json project bestand.",
             filetypes=[("project file", ".json")],
         )
         if filename:
             try:
-                read_config = loadConfig(filename)
+                read_config = load_config(filename)
             except ValueError:
                 messagebox.showerror(
                     title="Fout",
@@ -130,11 +130,11 @@ class ConfigApp(tk.Tk):
             else:
                 build.setTkVars(self._template, read_config)
 
-    def cmdOpslaanProject(self):
+    def save_project_cmd(self):
         config = build.buildConfigDict(self._template)
         filename = filedialog.asksaveasfilename(
             title="Kies een .json project bestand.",
-            initialfile=_projectFilename(project_name(config)),
+            initialfile=_project_filename(project_name(config)),
             filetypes=[("project file", ".json")],
         )
 
@@ -142,7 +142,7 @@ class ConfigApp(tk.Tk):
         if filename == "":
             return
 
-        filename = _projectFilename(filename, make_safe=False)
+        filename = _project_filename(filename, make_safe=False)
         try:
             saveConfig(filename, config)
         except BaseException:
@@ -151,9 +151,20 @@ class ConfigApp(tk.Tk):
             messagebox.showinfo(title="Opgeslagen", message="Configuratie opgeslagen.")
 
 
-def main(verbose=False):
-    if verbose:
-        logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+def main():
+    parser = argparse.ArgumentParser(prog="ikobconfig", description="Launch the IKOB config GUI.")
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Display logging messages over stdout.",
+    )
+    args = parser.parse_args()
+
+    if args.verbose:
+        logging.basicConfig(
+            stream=sys.stdout, level=logging.INFO, format="%(asctime)s - %(levelname)s - %(name)s -  %(message)s"
+        )
 
     if not validate.validateTemplate(default_configuration_definition()):
         messagebox.showerror(
@@ -166,13 +177,4 @@ def main(verbose=False):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(prog="ikobconfig", description="Launch the IKOB config GUI.")
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        help="Display logging messages over stdout.",
-    )
-    args = parser.parse_args()
-
     main()

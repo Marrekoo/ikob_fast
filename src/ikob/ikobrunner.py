@@ -2,16 +2,17 @@ import argparse
 import logging
 import sys
 import threading
-from tkinter import BooleanVar, Button, Frame, StringVar, Tk, filedialog, messagebox
+import traceback
+from tkinter import BooleanVar, Button, Frame, StringVar, Tk, Widget, filedialog, messagebox
 
 from ikob.combined_weights import calculate_combined_weights
 from ikob.competition import competition_on_citizens, competition_on_jobs
 from ikob.config import widgets
 from ikob.datasource import DataSource, DataType
 from ikob.deployment_opportunities import deployment_opportunities
-from ikob.generalised_travel_time import generalised_travel_time
-from ikob.group_distribution import distribute_over_groups
-from ikob.ikobconfig import getConfigFromArgs, loadConfig
+from ikob.distribute_over_groups import distribute_over_groups
+from ikob.generalized_travel_time import generalized_travel_time
+from ikob.ikobconfig import get_config_from_args, load_config
 from ikob.potential_companies import potential_companies
 from ikob.single_weights import calculate_single_weights
 
@@ -28,16 +29,16 @@ def run_scripts(project_file, skip_steps: list[bool] | None = None, write_weight
         write_weights: skip writing out weights results
     """
     logger.info("Reading project file: %s.", project_file)
-    config = getConfigFromArgs(project_file)
+    config = get_config_from_args(project_file)
 
     logger.info("Starting simulations...")
     if not skip_steps:
         skip_steps = [False] * 8
 
     if not skip_steps[0]:
-        travel_time = generalised_travel_time(config)
+        travel_time = generalized_travel_time(config)
     else:
-        travel_time = DataSource(config, DataType.GENERALISED_TRAVEL_TIME)
+        travel_time = DataSource(config, DataType.GENERALIZED_TRAVEL_TIME)
 
     if not skip_steps[1]:
         # TODO: Pass temporary SEGS output as arguments too.
@@ -91,8 +92,8 @@ def run_scripts(project_file, skip_steps: list[bool] | None = None, write_weight
 
 
 class ConfigApp(Tk):
-    PAD = {"padx": 5, "pady": 5}
-    IPAD = {"ipadx": 5, "ipady": 5}
+    PAD_X = 5
+    PAD_Y = 5
 
     stappen = (
         "Gegeneraliseerde reistijd berekenen uit tijd en kosten",
@@ -114,19 +115,23 @@ class ConfigApp(Tk):
         self.create_widgets()
 
     def create_widgets(self):
-        self.widgets = []
-        F1 = Frame()
-        F1.pack(expand=1, fill="both", **self.PAD)
-        self.widgets.extend(widgets.pathWidget(F1, "Project", self._configvar, file=True))
-        self.widgets.append(F1)
-        labels = [stap for stap in self.stappen]
-        self.widgets.extend(widgets.checklistWidget(F1, "Stappen", labels, self._checks, row=1, itemsperrow=1))
-        B = Button(master=F1, text="Start", command=lambda: threading.Thread(target=self.cmdRun).start())
-        B.grid(row=2, column=2, sticky="ew", **self.PAD)
-        self.run_button = B
-        self.widgets.append(B)
+        self.widgets: list[Widget] = []
 
-    def cmdRun(self):
+        frame = Frame()
+        frame.pack(expand=1, fill="both", padx=self.PAD_X, pady=self.PAD_Y)
+
+        self.widgets.extend(widgets.pathWidget(frame, "Project", self._configvar, file=True))
+        self.widgets.append(frame)
+
+        labels = [stap for stap in self.stappen]
+        self.widgets.extend(widgets.checklistWidget(frame, "Stappen", labels, self._checks, row=1, itemsperrow=1))
+
+        button = Button(master=frame, text="Start", command=lambda: threading.Thread(target=self.run_cmd).start())
+        button.grid(row=2, column=2, sticky="ew", padx=self.PAD_X, pady=self.PAD_Y)
+        self.run_button = button
+        self.widgets.append(button)
+
+    def run_cmd(self):
         project_file = self._configvar.get()
 
         # Skip the test when its _not_ selected.
@@ -134,15 +139,17 @@ class ConfigApp(Tk):
 
         # Disable the run button while the scripts are running
         # to prevent users launching many run_scripts instances.
+        if self.run_button is None:
+            raise ValueError("attempt to disable run button, but run button is None.")
         self.run_button.configure(state="disabled")
 
         try:
             run_scripts(project_file, skip_steps, write_weights=False)
         except BaseException as err:
-            msg = f"An error occured: {err}"
+            msg = f"An error occurred: {err}"
             messagebox.showerror(title="FOUT", message=msg)
         else:
-            msg = "Alle stappen zijn succesvol uitegevoerd."
+            msg = "Alle stappen zijn succesvol uitgevoerd."
             messagebox.showinfo(title="Gereed", message=msg)
 
         # After success/error the run button can be re-enabled.
@@ -155,7 +162,7 @@ class ConfigApp(Tk):
         )
         if filename:
             try:
-                _ = loadConfig(filename)
+                _ = load_config(filename)
             except ValueError:
                 messagebox.showerror(
                     title="Fout",
@@ -165,14 +172,7 @@ class ConfigApp(Tk):
                 messagebox.showerror(title="Fout", message="Het bestand kan niet worden geladen.")
 
 
-def main(verbose=False):
-    if verbose:
-        logging.basicConfig(stream=sys.stdout, level=logging.INFO)
-    App = ConfigApp()
-    App.mainloop()
-
-
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(prog="ikobrunner", description="Launch the IKOB runner GUI.")
     parser.add_argument(
         "-v",
@@ -180,6 +180,28 @@ if __name__ == "__main__":
         action="store_true",
         help="Display logging messages over stdout.",
     )
+    parser.add_argument(
+        "-p",
+        "--project",
+        help="Optional path to the project to execute. No Gui is shown if provided, and every ikob step is executed.",
+    )
     args = parser.parse_args()
 
-    main(args.verbose)
+    if args.verbose:
+        logging.basicConfig(
+            stream=sys.stdout, level=logging.INFO, format="%(asctime)s - %(levelname)s - %(name)s \t -  %(message)s"
+        )
+    if not args.project:
+        App = ConfigApp()
+        App.mainloop()
+    else:
+        try:
+            run_scripts(args.project)
+        except BaseException:
+            logger.error(traceback.format_exc())
+        else:
+            logger.info("Alle steps successfully executed.")
+
+
+if __name__ == "__main__":
+    main()

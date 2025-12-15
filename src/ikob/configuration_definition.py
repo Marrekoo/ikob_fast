@@ -59,11 +59,8 @@ def default_project_tab():
         ),
         "paden": {
             "label": "Paden",
-            "skims_directory": config_item(
-                "Basis directory",
-                DataType.DIRECTORY,
-            ),
-            "segs_directory": config_item("SEGS directory", DataType.DIRECTORY, default="SEGS"),
+            "skims_directory": config_item("Basis directory", DataType.DIRECTORY),
+            "segs_directory": config_item("SEGS directory", DataType.DIRECTORY),
             "output_directory": config_item("Output directory", DataType.DIRECTORY, default="output"),
         },
         "motieven": config_item(

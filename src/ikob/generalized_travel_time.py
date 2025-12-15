@@ -26,8 +26,8 @@ def costs_public_transport(distance, pt_km_price, starting_rate, pricecap, price
     return distance
 
 
-def generalised_travel_time(config) -> DataSource:
-    logger.info("Compute generalised travel time from time and costs.")
+def generalized_travel_time(config) -> DataSource:
+    logger.info("Starting step: Compute generalized travel time from time and costs.")
 
     project_config = config["project"]
     skims_config = config["skims"]
@@ -79,15 +79,16 @@ def generalised_travel_time(config) -> DataSource:
     road_pricing_fossil = road_pricing_fossil / 100
     road_pricing_electric = road_pricing_electric / 100
     fuel_kinds = ["fossiel", "elektrisch"]
-    parking_times = read_parking_times(config)
 
     SegsSource(config)
+    parking_times = read_parking_times(config)
 
     skims_dir = config["project"]["paden"]["skims_directory"]
     skims_reader = SkimsSource(skims_dir)
 
-    generalised_travel_time = DataSource(config, DataType.GENERALISED_TRAVEL_TIME)
+    generalized_travel_time = DataSource(config, DataType.GENERALIZED_TRAVEL_TIME)
 
+    num_zones = None
     for motive in motives:
         tvom = tvom_work if motive == "werk" else tvom_other
         for pod in part_of_day:
@@ -96,11 +97,15 @@ def generalised_travel_time(config) -> DataSource:
             bike_time_matrix = skims_reader.read("Fiets_Tijd", pod)
             pt_time_matrix = skims_reader.read("OV_Tijd", pod)
 
-            num_zones_time = len(car_time_matrix)
-            num_zones_distance = len(car_distance_matrix)
-            msg = f"Number of zones in time and distance have to match: {num_zones_distance} == {num_zones_time}"
-            assert num_zones_distance == num_zones_time, msg
-            num_zones = num_zones_time
+            num_zones = _check_size_assumptions(
+                car_time_matrix,
+                car_distance_matrix,
+                bike_time_matrix,
+                pt_time_matrix,
+                parking_cost_array,
+                parking_times,
+                old_num_zones=num_zones,
+            )
 
             if pt_cost_file:
                 pt_cost_matrix = skims_reader.read("OV_Kosten", pod)
@@ -113,12 +118,12 @@ def generalised_travel_time(config) -> DataSource:
                 )
 
             # Eerst de fiets:
-            ggr_skim = np.where(bike_time_matrix < 180, bike_time_matrix, 9999)
+            gtr_skim = np.where(bike_time_matrix < 180, bike_time_matrix, 9999)
 
             key = DataKey(id="Fiets", part_of_day=pod, regime=regime, motive=motive)
-            generalised_travel_time.set(key, ggr_skim.copy())
+            generalized_travel_time.set(key, gtr_skim.copy())
 
-            ggr_skim = np.zeros((num_zones, num_zones))
+            gtr_skim = np.zeros((num_zones, num_zones))
             for income_level in income_levels:
                 factor = tvom.get(income_level)
 
@@ -133,13 +138,13 @@ def generalised_travel_time(config) -> DataSource:
                         for j in range(num_zones):
                             total_time = car_time_matrix[i][j] + parking_times[i][1] + parking_times[j][2]
                             if additional_costs:
-                                ggr_skim[i][j] = total_time + factor * (
+                                gtr_skim[i][j] = total_time + factor * (
                                     car_distance_matrix[i][j] * (var_car_rate + road_pricing)
                                     + additional_cost_matrix[i][j] / 100
                                     + parking_cost_array[j] / 100
                                 )
                             else:
-                                ggr_skim[i][j] = total_time + factor * (
+                                gtr_skim[i][j] = total_time + factor * (
                                     car_distance_matrix[i][j] * (var_car_rate + road_pricing)
                                     + parking_cost_array[j] / 100
                                 )
@@ -152,8 +157,8 @@ def generalised_travel_time(config) -> DataSource:
                             motive=motive,
                             regime=regime,
                         )
-                        ggr_park_and_bike_skim = generalised_travel_time.get(key)
-                        bestskim = np.minimum(ggr_skim, ggr_park_and_bike_skim)
+                        gtr_park_and_bike_skim = generalized_travel_time.get(key)
+                        bestskim = np.minimum(gtr_skim, gtr_park_and_bike_skim)
                         key = DataKey(
                             id=f"PplusR_{fuel_kind}",
                             part_of_day=pod,
@@ -162,23 +167,23 @@ def generalised_travel_time(config) -> DataSource:
                             motive=motive,
                             regime=regime,
                         )
-                        ggr_park_and_ride_skim = generalised_travel_time.get(key)
-                        ggr_skim = np.minimum(bestskim, ggr_park_and_ride_skim)
+                        gtr_park_and_ride_skim = generalized_travel_time.get(key)
+                        gtr_skim = np.minimum(bestskim, gtr_park_and_ride_skim)
 
                     key = DataKey(
                         id=f"Auto_{fuel_kind}", part_of_day=pod, income=income_level, regime=regime, motive=motive
                     )
-                    generalised_travel_time.set(key, ggr_skim.copy())
+                    generalized_travel_time.set(key, gtr_skim.copy())
 
                 # Dan het OV
                 factor = tvom.get(income_level)
-                ggr_skim = np.where(pt_time_matrix > 0.5, pt_time_matrix + factor * pt_cost_matrix, 9999)
+                gtr_skim = np.where(pt_time_matrix > 0.5, pt_time_matrix + factor * pt_cost_matrix, 9999)
                 key = DataKey(id="OV", part_of_day=pod, income=income_level, motive=motive, regime=regime)
-                generalised_travel_time.set(key, ggr_skim.copy())
+                generalized_travel_time.set(key, gtr_skim.copy())
 
                 # Dan geen auto (rijbewijs)
                 for kind in kind_no_car:
-                    ggr_skim.fill(99999)
+                    gtr_skim.fill(99999)
                     factor = tvom.get(income_level)
                     for i in range(num_zones):
                         for j in range(num_zones):
@@ -186,34 +191,68 @@ def generalised_travel_time(config) -> DataSource:
                             total_cost = car_time_matrix[i][j] * time_costs_no_car.get(kind) + car_distance_matrix[i][
                                 j
                             ] * (costs_no_car.get(kind) + road_pricing)
-                            ggr_skim[i][j] = total_time + factor * total_cost
+                            gtr_skim[i][j] = total_time + factor * total_cost
 
                     key = DataKey(id=f"{kind}", part_of_day=pod, income=income_level, motive=motive, regime=regime)
-                    generalised_travel_time.set(key, ggr_skim.copy())
+                    generalized_travel_time.set(key, gtr_skim.copy())
 
                 # GratisAuto
                 for income_level in income_levels:
-                    ggr_skim.fill(0)
+                    gtr_skim.fill(0)
                     factor = tvom.get(income_level)
                     for i in range(num_zones):
                         for j in range(num_zones):
                             total_time = car_time_matrix[i][j] + parking_times[i][1] + parking_times[j][2]
                             if additional_costs:
-                                ggr_skim[i][j] = total_time + factor * (
+                                gtr_skim[i][j] = total_time + factor * (
                                     car_distance_matrix[i][j] * road_pricing
                                     + additional_cost_matrix[i][j] / 100
                                     + parking_cost_array[j] / 100
                                 )
                             else:
-                                ggr_skim[i][j] = total_time + factor * (
+                                gtr_skim[i][j] = total_time + factor * (
                                     car_distance_matrix[i][j] * road_pricing + parking_cost_array[j] / 100
                                 )
                     key = DataKey(id="GratisAuto", part_of_day=pod, income=income_level, motive=motive, regime=regime)
-                    generalised_travel_time.set(key, ggr_skim.copy())
+                    generalized_travel_time.set(key, gtr_skim.copy())
 
                 # GratisOV
-                ggr_skim = np.where(pt_time_matrix > 0.5, pt_time_matrix, 9999)
+                gtr_skim = np.where(pt_time_matrix > 0.5, pt_time_matrix, 9999)
                 key = DataKey(id="GratisOV", part_of_day=pod, motive=motive, regime=regime)
-                generalised_travel_time.set(key, ggr_skim.copy())
+                generalized_travel_time.set(key, gtr_skim.copy())
 
-    return generalised_travel_time
+    return generalized_travel_time
+
+
+def _check_size_assumptions(
+    car_time_matrix: np.ndarray,
+    car_distance_matrix: np.ndarray,
+    bike_time_matrix: np.ndarray,
+    pt_time_matrix: np.ndarray,
+    parking_cost_array: np.ndarray,
+    parking_times: np.ndarray | list[list[int]],
+    old_num_zones: int | None,
+) -> int:
+    """The travel time code expects the shapes of all these matrices to be the same, and equal to the number of zones.
+
+    The arrays are expected to have this length"""
+    assert (
+        car_time_matrix.shape
+        == car_distance_matrix.shape
+        == bike_time_matrix.shape
+        == bike_time_matrix.shape
+        == pt_time_matrix.shape
+        and pt_time_matrix.shape[0] == pt_time_matrix.shape[1]
+    ), (
+        "The travel time code expects the shapes of all these matrices to be the same, and equal to the number of zones in both dimensions"
+    )
+    num_zones = len(pt_time_matrix)
+    assert len(parking_cost_array) == num_zones, (
+        "The parking costs is expected to be of length equal to the number of zones"
+    )
+    assert len(parking_times) == num_zones and len(parking_times[0]) == 3, (
+        "The parking times is expected to contain 3 values for each zone. (the zone, the arrival search time, the departure search time)"
+    )
+    if old_num_zones is not None:
+        assert num_zones == old_num_zones, "The number of zones should be constant throughout generalized travel time"
+    return num_zones

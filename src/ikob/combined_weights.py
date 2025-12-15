@@ -37,7 +37,7 @@ def has_preference(kind_car, kind_pt, preference):
 
 
 def calculate_combined_weights(config, single_weights: DataSource) -> DataSource:
-    logger.info("Maximum weights by multiple modalities.")
+    logger.info("Starting step: Maximum weights by multiple modalities.")
 
     project_config = config["project"]
     skims_config = config["skims"]
