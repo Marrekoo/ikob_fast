@@ -9,8 +9,8 @@ from ikob.combined_weights import calculate_combined_weights
 from ikob.competition import competition_on_citizens, competition_on_jobs
 from ikob.config import widgets
 from ikob.datasource import DataSource, DataType
-from ikob.deployment_opportunities import deployment_opportunities
-from ikob.distribute_over_groups import distribute_over_groups
+from ikob.distribute_over_groups import distribute_groups_over_zones
+from ikob.employment_opportunities import employment_opportunities
 from ikob.generalized_travel_time import generalized_travel_time
 from ikob.ikobconfig import get_config_from_args, load_config
 from ikob.potential_companies import potential_companies
@@ -22,6 +22,11 @@ logger = logging.getLogger(__name__)
 def run_scripts(project_file, skip_steps: list[bool] | None = None, write_weights: bool = False):
     """
     Run through all steps for a given project.
+
+    For details about the all the steps taken see documentation/IKOB-algorithm.pdf.
+    In de docstring of each specific step the relevant section of the documentation is referenced.
+    documentation/IKOB-documentation-partially-outdated.pdf is partially outdated, but might still provide some insight into the code.
+    Do note that at the very least naming has changed and output is not written to disk after each step any more.
 
     Args:
         project_file: the path to a JSON project config
@@ -42,7 +47,7 @@ def run_scripts(project_file, skip_steps: list[bool] | None = None, write_weight
 
     if not skip_steps[1]:
         # TODO: Pass temporary SEGS output as arguments too.
-        distribute_over_groups(config)
+        distribute_groups_over_zones(config)
 
     if not skip_steps[2]:
         single_weights = calculate_single_weights(config, travel_time)
@@ -55,9 +60,9 @@ def run_scripts(project_file, skip_steps: list[bool] | None = None, write_weight
         combined_weights = DataSource(config, DataType.WEIGHTS)
 
     if not skip_steps[4]:
-        possibilities = deployment_opportunities(config, single_weights, combined_weights)
+        opportunities = employment_opportunities(config, single_weights, combined_weights)
     else:
-        possibilities = DataSource(config, DataType.DESTINATIONS)
+        opportunities = DataSource(config, DataType.DESTINATIONS)
 
     if not skip_steps[5]:
         origins = potential_companies(config, single_weights, combined_weights)
@@ -70,7 +75,7 @@ def run_scripts(project_file, skip_steps: list[bool] | None = None, write_weight
         competition_jobs = DataSource(config, DataType.COMPETITION)
 
     if not skip_steps[7]:
-        competition_citizens = competition_on_citizens(config, single_weights, combined_weights, possibilities)
+        competition_citizens = competition_on_citizens(config, single_weights, combined_weights, opportunities)
     else:
         competition_citizens = DataSource(config, DataType.COMPETITION)
 
@@ -80,7 +85,7 @@ def run_scripts(project_file, skip_steps: list[bool] | None = None, write_weight
     # end-to-end testing. Ultimately only files that are essential outputs
     # should persist.
     logger.info("Writing output to disk...")
-    sources_to_save = [travel_time, possibilities, origins, competition_citizens, competition_jobs]
+    sources_to_save = [travel_time, opportunities, origins, competition_citizens, competition_jobs]
     if write_weights:
         sources_to_save.extend([single_weights, combined_weights])
 

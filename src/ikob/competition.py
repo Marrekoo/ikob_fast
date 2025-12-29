@@ -99,6 +99,14 @@ def get_weight_matrix(
 def competition_on_jobs(
     config, single_weights: DataSource, combined_weights: DataSource, origins: DataSource
 ) -> DataSource:
+    """
+    For every zone it's determined if the zone has a (dis)advantage compared to other zones in reaching employment opportunities.
+
+    Corresponds to section D6 in the IKOB-algorithm.pdf.
+
+    D6 defines a competition factor residents that discounts
+    destinations with many competing residents.
+    """
     logger.info("Starting step: Compute competition on jobs")
     return competition(config, single_weights, combined_weights, origins, citizens=False)
 
@@ -106,6 +114,14 @@ def competition_on_jobs(
 def competition_on_citizens(
     config, single_weights: DataSource, combined_weights: DataSource, origins: DataSource
 ) -> DataSource:
+    """
+    For every zone with employment opportunities it's determined if the zone has a (dis)advantage compared to other zones in attracting citizens.
+
+    Corresponds to section D7 in the IKOB-algorithm.pdf.
+
+    D7 is the "mirror" of D6: it defines a competition factor for jobs/destinations that discounts
+    origins with many competing jobs/destinations.
+    """
     logger.info("Starting step: Compute competition on citizens")
     return competition(config, single_weights, combined_weights, origins, citizens=True)
 
@@ -114,7 +130,7 @@ def competition(
     config, single_weights: DataSource, combined_weights: DataSource, origins: DataSource, citizens: bool = True
 ) -> DataSource:
     if citizens:
-        msg = "Competition for companies and accessibility."
+        msg = "Competition for citizens."
     else:
         msg = "Competition for places of employment."
     logger.info(msg)
@@ -245,6 +261,12 @@ def competition(
                         )
                         reach = origins.get(key)
 
+                        # Section D6/D7: `reach` is the previously computed reachability used as denominator.
+                        # - citizens=False (D6 / competition_on_jobs): `reach` comes from D5 / potential_companies and is destination-side potential (how many
+                        #   residents can reach each destination zone).
+                        # - citizens=True  (D7 / competition_on_citizens): `reach` comes from D4 / employment_opportunities and is origin-side reachable opportunities
+                        #   (how many jobs/places residents in an origin zone can reach).
+
                         competition_total = np.zeros(len(citizens_or_places_of_employment))
 
                         for i_group, group in enumerate(groups):
@@ -267,9 +289,20 @@ def competition(
                                     K,
                                 )
 
+                                # Section D6/D7 competition term:
+                                # Compute a scarcity/competition ratio per zone and propagate it through the origin-destination weights.
+                                # - citizens=False (D6 / competition_on_jobs): `citizens_or_places_of_employment` is $A_{ib}$ (jobs/places per
+                                #   destination). Dividing by `reach` discounts destinations with many competing residents.
+                                # - citizens=True  (D7 / competition_on_citizens): `citizens_or_places_of_employment` is $I_{ih}$ (residents per
+                                #   origin). Dividing by `reach` discounts origins with many reachable opportunities.
                                 competition = matrix @ (
                                     citizens_or_places_of_employment.T[i_income_group] / np.where(reach > 0, reach, 1.0)
                                 )
+
+                                # aggregation to income-class level:
+                                # We sum across all groups whose income level matches `income_group`.
+                                # The `distribution` and `income_distribution` scaling makes this an income-class level
+                                # score rather than a raw per-group score.
                                 competition_total += (
                                     competition
                                     * distribution
@@ -312,7 +345,7 @@ def competition(
                             subtopic=subtopic_competition,
                         )
                         general_matrix.append(competitions.get(key))
-                        general_totals_transpose = utils.transpose(general_matrix)
+                    general_totals_transpose = utils.transpose(general_matrix)
 
                     for i in range(len(citizens_or_places_of_employment)):
                         general_matrix_product.append([])

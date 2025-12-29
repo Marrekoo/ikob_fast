@@ -8,7 +8,14 @@ from ikob.datasource import SegsSource, read_csv_from_config
 logger = logging.getLogger(__name__)
 
 
-def distribute_over_groups(config):
+def distribute_groups_over_zones(config):
+    """
+    Distribute groups over zones
+
+    Corresponds to section B in IKOB-algorithm.pdf
+
+    This step does not work with a data source like the other steps, but instead writes the result to file.
+    """
     logger.info("Starting step: Distribute groups over zones")
 
     project_config = config["project"]
@@ -18,6 +25,7 @@ def distribute_over_groups(config):
     # Ophalen van instellingen
     scenario = project_config["verstedelijkingsscenario"]
     artificial = advanced_config["kunstmab"]["gebruiken"]
+    # This seems to be Table 5 of IKOB-algorithm.pdf, although this uses a flat percentage for all urbanization grades
     free_pt_percentage = verdeling_config["GratisOVpercentage"]
     motieven = project_config["motieven"]
 
@@ -34,6 +42,7 @@ def distribute_over_groups(config):
     # Decrement one to account for zero-based indexing later on.
     urbanization = [int(sgg) - 1 for sgg in urbanization_grade_segs]
 
+    # See table 4 of section B in IKOB-algorithm.pdf for the source
     free_car_per_income = [0, 0.02, 0.175, 0.275]
     min_car_possession = car_possessions_per_household_segs
 
@@ -43,10 +52,11 @@ def distribute_over_groups(config):
             itertools.starmap(min, zip(car_possessions_per_household_segs, artificial_car_possession_segs))
         )
 
-    # Read SEGS input files.
+    # Read SEGS input files. See tables 1-3 of IKOB-algorithm.pdf
     no_license_segs = segs_source.read("GeenRijbewijs")
     no_car_segs = segs_source.read("GeenAuto")
     with_car_segs = segs_source.read("WelAuto")
+    # Tables 6-7 of IKOB-algorithm.pdf
     preferences_segs = segs_source.read("Voorkeuren")
     preferences_no_car_segs = segs_source.read("VoorkeurenGeenAuto")
 
@@ -92,11 +102,12 @@ def distribute_over_groups(config):
         income_distributions = citizens_per_class / citizens_totals[:, None]
         income_distributions[citizens_totals == 0][:] = 0
 
-        # First determine theoretical car and possessions.
         for i, income_distribution in enumerate(income_distributions):
             total_survey.append([])
             total_car_possession_survey.append([])
             survey_per_income_class.append([])
+            # First determine theoretical car and possessions.
+            # See Step 1 in section B of IKOB-algorithm.pdf
             car_possession_share = []
             for id, wc in zip(income_distribution, with_car_segs[urbanization[i]]):
                 car_possession_share.append(id * wc / 100)
@@ -120,8 +131,8 @@ def distribute_over_groups(config):
                 no_car_with_license = no_car_segs[urbanization[i]][i_income] / 100 * no_car_correction
                 no_license = no_license_segs[urbanization[i]][i_income] / 100 * no_car_correction
 
-                # Van de auto's de gratisauto's en gratisauto en OV-bepalen en de rest overhouden
-
+                # Step 2 of section B of IKOB-algorithm.pdf
+                # Also computes free pt data
                 income_share = income_distribution[i_income]
 
                 free_car = with_car * free_car_per_income[i_income]
@@ -138,6 +149,7 @@ def distribute_over_groups(config):
                 total_survey[i].append(free_pt_share)
                 survey_per_income_class[i].append(free_pt_share / with_car)
 
+                # Step 3 of section B of IKOB-algorithm.pdf
                 for i_preference in range(len(preferences)):
                     share_preference = (
                         no_free_car * (1 - free_pt_percentage) * preferences_segs[urbanization[i]][i_preference] / 100
@@ -176,7 +188,7 @@ def distribute_over_groups(config):
                     total_survey[i].append(preference_share)
                     survey_per_income_class[i].append(0)
 
-        logger.debug("Total car posessions: %s", total_car_possession_survey)
+        logger.debug("Total car possessions: %s", total_car_possession_survey)
         segs_source.write_csv(
             total_survey, "Verdeling_over_groepen", group=population_share, scenario=scenario, header=header
         )

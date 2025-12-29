@@ -37,6 +37,14 @@ def has_preference(kind_car, kind_pt, preference):
 
 
 def calculate_combined_weights(config, single_weights: DataSource) -> DataSource:
+    """
+    From weights for single travel modes to combined weights.
+
+    Corresponds to section D3 in the IKOB-algorithm.pdf
+
+    Travelers are expected to always take the travel mode of least resistance (highest weight) available.
+    i.e. the maximum weight over the available travel modes is taken here.
+    """
     logger.info("Starting step: Maximum weights by multiple modalities.")
 
     project_config = config["project"]
@@ -53,7 +61,7 @@ def calculate_combined_weights(config, single_weights: DataSource) -> DataSource
     pt_kinds = ["OV", "GratisOV"]
     fuel_kinds = ["fossiel", "elektrisch"]
 
-    combined_weigths = DataSource(config, DataType.WEIGHTS)
+    combined_weights = DataSource(config, DataType.WEIGHTS)
 
     for motive in motives:
         for part_of_day in part_of_days:
@@ -94,7 +102,8 @@ def calculate_combined_weights(config, single_weights: DataSource) -> DataSource
                                 preference=preference,
                                 subtopic="combinaties",
                             )
-                            combined_weigths.set(key, max.copy())
+                            # Max weight of taking either pt or the bike
+                            combined_weights.set(key, max.copy())
 
                         for car_kind in car_kinds:
                             if not has_preference(car_kind, "OV", preference):
@@ -134,7 +143,8 @@ def calculate_combined_weights(config, single_weights: DataSource) -> DataSource
                                         subtopic="combinaties",
                                         fuel_kind=fuel_kind,
                                     )
-                                    combined_weigths.set(key, max.copy())
+                                    # Max weight of taking either the car or the bike
+                                    combined_weights.set(key, max.copy())
                             else:
                                 key = DataKey(
                                     f"{car_kind}_vk",
@@ -156,7 +166,8 @@ def calculate_combined_weights(config, single_weights: DataSource) -> DataSource
                                     preference=preference,
                                     subtopic="combinaties",
                                 )
-                                combined_weigths.set(key, max.copy())
+                                # Max weight of taking either the car or the bike
+                                combined_weights.set(key, max.copy())
 
                     for pt_kind in pt_kinds:
                         for car_kind in car_kinds:
@@ -196,7 +207,8 @@ def calculate_combined_weights(config, single_weights: DataSource) -> DataSource
                                         subtopic="combinaties",
                                         fuel_kind=fuel_kind,
                                     )
-                                    combined_weigths.set(key, max.copy())
+                                    # Max weight of taking either the car or pt
+                                    combined_weights.set(key, max.copy())
                             else:
                                 key = DataKey(
                                     f"{car_kind}_vk",
@@ -218,7 +230,8 @@ def calculate_combined_weights(config, single_weights: DataSource) -> DataSource
                                     preference=preference,
                                     subtopic="combinaties",
                                 )
-                                combined_weigths.set(key, max.copy())
+                                # Max weight of taking either the car or pt
+                                combined_weights.set(key, max.copy())
 
                     for modality_bike in modalities_bike:
                         for pt_kind in pt_kinds:
@@ -270,7 +283,8 @@ def calculate_combined_weights(config, single_weights: DataSource) -> DataSource
                                             subtopic="combinaties",
                                             fuel_kind=fuel_kind,
                                         )
-                                        combined_weigths.set(key, max.copy())
+                                        # Max weight of taking either the car or pt or the bike
+                                        combined_weights.set(key, max.copy())
                                 else:
                                     key = DataKey(
                                         f"{car_kind}_vk",
@@ -292,6 +306,7 @@ def calculate_combined_weights(config, single_weights: DataSource) -> DataSource
                                         preference=preference,
                                         subtopic="combinaties",
                                     )
-                                    combined_weigths.set(key, max.copy())
+                                    # Max weight of taking either the car or pt or the bike
+                                    combined_weights.set(key, max.copy())
 
-    return combined_weigths
+    return combined_weights

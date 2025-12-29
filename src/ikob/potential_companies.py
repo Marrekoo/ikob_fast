@@ -18,6 +18,11 @@ def create_citizens_file(distribution_matrix, working_population):
 
 
 def potential_companies(config, single_weights: DataSource, combined_weights: DataSource) -> DataSource:
+    """
+    From combined weights to number of citizens that can reach employment opportunities
+
+    Corresponds to section D5 in the IKOB-algorithm.pdf.
+    """
     logger.info("Starting step: Possibilities for companies and institutes.")
 
     project_config = config["project"]
@@ -114,6 +119,8 @@ def potential_companies(config, single_weights: DataSource, combined_weights: Da
     for i in range(len(working_population_income_class)):
         working_population.append(sum(working_population_income_class[i]))
 
+    # section D5: derive group sizes $I_{gh}$ per origin zone by distributing the origin-zone working population
+    # over groups using the SEG distribution matrix.
     citizens = create_citizens_file(distribution_matrix, working_population)
     citizens_transpose = utils.transpose(citizens)
 
@@ -160,6 +167,8 @@ def potential_companies(config, single_weights: DataSource, combined_weights: Da
                                         motive=motive,
                                     )
                                     bike_matrix = single_weights.get(key).T
+
+                                    # section D5: $B_{gbv} = \sum_h I_{gh} \cdot G_{ghbvm}$.
                                     working_population_list += bike_matrix @ citizens_transpose[igroup]
 
                                 elif modality == "Auto":
@@ -182,6 +191,7 @@ def potential_companies(config, single_weights: DataSource, combined_weights: Da
                                             else:
                                                 K = 1 - electric_percentage.get(income_group) / 100
 
+                                            # section D5: same $\sum_h I_{gh} \cdot G_{ghbvm}$ computation, with fuel share K.
                                             working_population_list += K * matrix @ citizens_transpose[igroup]
                                     else:
                                         key = DataKey(
@@ -193,6 +203,8 @@ def potential_companies(config, single_weights: DataSource, combined_weights: Da
                                             motive=motive,
                                         )
                                         matrix = single_weights.get(key).T
+
+                                        # section D5: $\sum_h I_{gh} \cdot G_{ghbvm}$ for auto groups without fuel split.
                                         working_population_list += matrix @ citizens_transpose[igroup]
 
                                 elif modality == "OV":
@@ -206,12 +218,15 @@ def potential_companies(config, single_weights: DataSource, combined_weights: Da
                                         motive=motive,
                                     )
                                     matrix = single_weights.get(key).T
+
+                                    # section D5: $\sum_h I_{gh} \cdot G_{ghbvm}$ for OV.
                                     working_population_list += matrix @ citizens_transpose[igroup]
                                 else:
                                     string = utils.combined_group(modality, group)
                                     logger.debug("de gr is %s", group)
                                     logger.debug("de string is %s", string)
                                     if string[0] == "A":
+                                        # Its a group with auto, so we need to split by fuel kind
                                         for fuel_kind in fuel_kinds:
                                             key = DataKey(
                                                 f"{string}_vk",
@@ -230,6 +245,7 @@ def potential_companies(config, single_weights: DataSource, combined_weights: Da
                                             else:
                                                 K = 1 - electric_percentage.get(income_group) / 100
 
+                                            # section D5: combined-mode $\sum_h I_{gh} \cdot G_{ghbvm}$, with fuel share K.
                                             working_population_list += K * matrix @ citizens_transpose[igroup]
 
                                     else:
@@ -243,6 +259,8 @@ def potential_companies(config, single_weights: DataSource, combined_weights: Da
                                             subtopic="combinaties",
                                         )
                                         matrix = combined_weights.get(key).T
+
+                                        # section D5: combined-mode $\sum_h I_{gh} \cdot G_{ghbvm}$.
                                         working_population_list += matrix @ citizens_transpose[igroup]
 
                         key = DataKey(
@@ -296,6 +314,12 @@ def potential_companies(config, single_weights: DataSource, combined_weights: Da
                                 )
                             else:
                                 general_matrix_product[i].append(0)
+
+                    # Section D5 regional aggregation note:
+                    # The PDF defines $B_{irv}$ as a jobs-weighted aggregation over destination zones in a region.
+                    # Here `Pot_totaalproduct` prepares the numerator term $B_{ibv} \cdot A_{ib}$ by multiplying
+                    # the destination-level reach (`general_total_transpose`) by the number of jobs/pupil-places
+                    # in that destination zone (`place_of_employment_class`).
 
                     general_total_transpose = np.round(general_total_transpose).astype(int)
                     key = DataKey(

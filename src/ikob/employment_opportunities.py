@@ -9,8 +9,16 @@ from ikob.datasource import DataKey, DataSource, DataType, SegsSource
 logger = logging.getLogger(__name__)
 
 
-def deployment_opportunities(config, single_weights: DataSource, combined_weights: DataSource) -> DataSource:
-    logger.info("Starting step: Deployment opportunities for citizens.")
+def employment_opportunities(config, single_weights: DataSource, combined_weights: DataSource) -> DataSource:
+    """
+    From (combined) weights to reachable employment opportunities.
+
+    The definition of employment opportunities and the population to consider changes based on the travel motive to consider.
+    For example, for education students and schools are considered while for the motive work the working population and jobs are considered.
+
+    Corresponds to section D4 in the IKOB-algorithm.pdf
+    """
+    logger.info("Starting step: Employment opportunities for citizens.")
 
     project_config = config["project"]
     skims_config = config["skims"]
@@ -136,7 +144,18 @@ def deployment_opportunities(config, single_weights: DataSource, combined_weight
                                     income_group,
                                     K,
                                 )
-                                possibility = matrix @ place_of_employment * distribution
+
+                                # section D4: compute reachable opportunities via origin-destination weights and destination totals.
+                                # - `matrix` corresponds to $G_{ghbvm}$
+                                # - `place_of_employment` corresponds to $A_{ib}$ (chosen by motive)
+                                # The matrix-vector product yields $\sum_b G_{ghbvm} \cdot A_{ib}$ per origin zone $h$.
+                                possibility = matrix @ place_of_employment
+
+                                # D4: apply group size/share in the origin zone.
+                                # This corresponds to multiplying by $V_{gh}$ to obtain $B_{ghv}$ for the current group.
+                                possibility = possibility * distribution
+
+                                # Sum contributions of all groups that belong to the selected `income_group`, this computes B_{ihv}
                                 possibility = np.divide(possibility, incomes, where=incomes > 0)
                                 possibility[incomes <= 0] = 0
                                 possibility_sum += possibility
@@ -193,6 +212,15 @@ def deployment_opportunities(config, single_weights: DataSource, combined_weight
                                 )
                             else:
                                 general_matrix_product[i].append(0)
+
+                    # section D4 regional aggregation note:
+                    # The PDF defines $B_{irv}$ as a population-weighted aggregation of zone-level reachability
+                    # $B_{ihv}$ over the zones $h$ that belong to a region $r$:
+                    #   $B_{irv} = (\sum_{h \in r} B_{ihv} \cdot I_{ih}) / (\sum_{h \in r} I_{ih})$.
+                    # This function does not explicitly group zones into regions or compute that weighted average.
+                    # Instead, `Ontpl_totaalproduct` prepares the numerator term $B_{ihv} \cdot I_{ih}$ by
+                    # multiplying the per-zone reachability by the (income-class) population per zone.
+                    # The denominator $\sum_{h \in r} I_{ih}$ would need to be applied in a later aggregation step.
 
                     general_possibility_totals_transposed = np.round(general_possibility_totals_transposed).astype(int)
                     key = DataKey(

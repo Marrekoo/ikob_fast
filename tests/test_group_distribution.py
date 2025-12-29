@@ -3,7 +3,7 @@ import pathlib
 
 from test_end_to_end import compare_directories, remove_directory
 
-from ikob.distribute_over_groups import distribute_over_groups
+from ikob.distribute_over_groups import distribute_groups_over_zones
 from ikob.ikobconfig import get_config_from_args
 
 logger = logging.getLogger(__name__)
@@ -21,7 +21,7 @@ def test_group_distribution():
     project_dir = pathlib.Path(f"tests/{case}/")
     config = get_config_from_args(project_dir / f"{case}.json")
 
-    distribute_over_groups(config)
+    distribute_groups_over_zones(config)
 
     msg = "Result and reference directories are not equal."
     result_dir = project_dir / case
