@@ -97,7 +97,7 @@ python src/ikob/ikobrunner.py
 ## Development
 
 For IKOB development first install IKOB following the manual installation
-outlined in the [#Installation-and-usage] section. This should provide a
+outlined in the [Installation and usage](#installation-and-usage) section. This should provide a
 local, editable installation of IKOB. To verify all is setup well, you
 can run the IKOB test suite through `pytest`.
 
@@ -112,11 +112,11 @@ To enable logger output:
 python -m pytest -o log_cli=true -o log_file_level=info
 ```
 
-The current CI pipelines enforce code formatting through `autopep8` and `isort`. To ensure modified sources files adhere to the requirements of these linters, run
+The current CI pipelines enforce code formatting through `ruff`.
+To ensure modified sources files adhere to the requirements of these linters, run
 
 ```sh
-isort src/ikob/*.py tests/*.py
-autopep8 --in-place --aggressive --aggressive src/ikob/*.py tests/*.py
+python -m ruff check
 ```
 
 ## Deployment
