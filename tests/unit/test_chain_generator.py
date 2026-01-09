@@ -7,6 +7,7 @@ from ikob.chain_generator import chain_generator
 
 
 def test_chain_generator(tmpdir):
+    # Prepare
     reference_dir = pathlib.Path("tests/chains/reference")
     skims_dir = pathlib.Path("tests/chains/restdag")
     result_dir = pathlib.Path(tmpdir) / "restdag"
@@ -14,14 +15,15 @@ def test_chain_generator(tmpdir):
     # Copy skims file into temporary dir
     shutil.copytree(skims_dir, result_dir, dirs_exist_ok=True)
 
-    # Generate results
     hubs = [35, 40, 94, 105, 134, 153, 184, 193, 204, 249, 288]
     name = "Masterplan_hubset"
     transfer_time_pt = 8
     transfer_time_bike = 5
 
+    # Act
     chain_generator(result_dir, name, hubs, transfer_time_pt, transfer_time_bike)
 
+    # Assert
     # Since output files are written back to input directory, the remaining
     # input files are removed before comparing output files with references.
     files_to_ignore_during_comparison = [
