@@ -1,4 +1,5 @@
 def work_constants(modality, preference, motive):
+    """Returns the value from Table 9-11 in IKOB-algorithm.pdf"""
     motives = ["werk", "sociaal-recreatief", "winkeldagelijks", "onderwijs"]
     assert motive in motives, f"Unknown motive: '{motive}'"
 

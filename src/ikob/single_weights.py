@@ -10,6 +10,11 @@ logger = logging.getLogger(__name__)
 
 
 def calculate_weights(generalized_travel_time, modality, preference, motive):
+    """
+    Applies a decay curve to the generalized travel time to compute a weight or 'resistance' for the movement.
+    A weight of 1 means a movement with very little resistance (a short & cheap movement).
+    A weight of 0 means a movement with a lot of resistance (a long & expensive movement).
+    """
     alpha, omega, scaling = work_constants(modality, preference, motive)
     n = len(generalized_travel_time)
     weight_matrix = np.zeros((n, n))
@@ -29,6 +34,14 @@ def calculate_weights(generalized_travel_time, modality, preference, motive):
 
 
 def calculate_single_weights(config, generalized_travel_time: DataSource) -> DataSource:
+    """
+    From experienced travel time to the computation of weights
+
+    Corresponds to section D2 in the IKOB-algorithm.pdf
+
+    Loops over the computed generalized travel time from the previous step and applies a decay curve to them.
+    """
+
     logger.info("Starting step: Weights (travel time decay curves) for car, PT, bike, and E-bike.")
 
     project_config = config["project"]

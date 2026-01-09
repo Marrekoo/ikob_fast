@@ -27,6 +27,12 @@ def costs_public_transport(distance, pt_km_price, starting_rate, pricecap, price
 
 
 def generalized_travel_time(config) -> DataSource:
+    """
+    Compute generalized (experienced) travel time from time and costs.
+
+    Corresponds to section D1 in IKOB-algorithm.pdf
+    """
+
     logger.info("Starting step: Compute generalized travel time from time and costs.")
 
     project_config = config["project"]
@@ -117,7 +123,7 @@ def generalized_travel_time(config) -> DataSource:
                     pt_distance_matrix, pt_km_price, starting_rate, pricecap, pricecap_value
                 )
 
-            # Eerst de fiets:
+            # Bike generalized travel time:
             gtr_skim = np.where(bike_time_matrix < 180, bike_time_matrix, 9999)
 
             key = DataKey(id="Fiets", part_of_day=pod, regime=regime, motive=motive)
@@ -126,7 +132,7 @@ def generalized_travel_time(config) -> DataSource:
             gtr_skim = np.zeros((num_zones, num_zones))
             for income_level in income_levels:
                 factor = tvom.get(income_level)
-
+                # Car generalized travel time:
                 for fuel_kind in fuel_kinds:
                     if fuel_kind == "fossiel":
                         var_car_rate = var_fossil
@@ -175,7 +181,8 @@ def generalized_travel_time(config) -> DataSource:
                     )
                     generalized_travel_time.set(key, gtr_skim.copy())
 
-                # Dan het OV
+                # Then PT, pt costs are (optionally) computed from travel times and skims_config["OV kosten"]
+                # This does tot strictly follow the documentation in IKOB-algorithm.pdf
                 factor = tvom.get(income_level)
                 gtr_skim = np.where(pt_time_matrix > 0.5, pt_time_matrix + factor * pt_cost_matrix, 9999)
                 key = DataKey(id="OV", part_of_day=pod, income=income_level, motive=motive, regime=regime)
@@ -196,7 +203,7 @@ def generalized_travel_time(config) -> DataSource:
                     key = DataKey(id=f"{kind}", part_of_day=pod, income=income_level, motive=motive, regime=regime)
                     generalized_travel_time.set(key, gtr_skim.copy())
 
-                # GratisAuto
+                # Free car (no variable costs compared to car) generalized travel time:
                 for income_level in income_levels:
                     gtr_skim.fill(0)
                     factor = tvom.get(income_level)
@@ -216,7 +223,7 @@ def generalized_travel_time(config) -> DataSource:
                     key = DataKey(id="GratisAuto", part_of_day=pod, income=income_level, motive=motive, regime=regime)
                     generalized_travel_time.set(key, gtr_skim.copy())
 
-                # GratisOV
+                # Free PT generalized travel time:
                 gtr_skim = np.where(pt_time_matrix > 0.5, pt_time_matrix, 9999)
                 key = DataKey(id="GratisOV", part_of_day=pod, motive=motive, regime=regime)
                 generalized_travel_time.set(key, gtr_skim.copy())
