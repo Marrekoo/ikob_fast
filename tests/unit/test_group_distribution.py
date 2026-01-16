@@ -1,12 +1,8 @@
-import logging
 import pathlib
-
-from test_end_to_end import compare_directories, remove_directory
 
 from ikob.distribute_over_groups import distribute_groups_over_zones
 from ikob.ikobconfig import get_config_from_args
-
-logger = logging.getLogger(__name__)
+from tests.e2e.test_end_to_end import compare_directories, remove_directory
 
 
 def test_group_distribution():

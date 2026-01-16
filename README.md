@@ -148,3 +148,24 @@ application under `dist/ikob`. This directory contains the executable as
 in `dist/ikobrunner/_internal`. The full directory, i.e. `dist/ikobrunner` is
 self contained and can be moved to the desired location. Running the executable
 will run the typical `ikobrunner` script.
+
+
+# Testing
+
+## Test Types
+
+- **Unit tests** (`tests/unit/`) - Test individual components using toy examples and monkey patching
+- **E2E tests** (`tests/e2e/`) - Run the full ikobrunner script end-to-end
+
+The remaining folders contain test projects and reference output. 
+
+## Reference Tests
+
+There are some reference tests:
+- test_end_to_end.py
+- test_chain_generator.py
+- test_parking_cost_file.py
+- test_group_distribution.py 
+
+These compare current output against stored reference output.
+These detect when output has changed but don't verify expected behavior. 

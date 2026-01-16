@@ -1,6 +1,6 @@
 import numpy as np
 
-from tests.conftest import SegsCapture
+from tests.unit.conftest import SegsCapture
 
 
 def _minimal_config():
@@ -141,11 +141,6 @@ def test_distribute_over_groups_computation(segs_capture):
     # Prepare
     # The `segs` dict represents the in-memory contents of the SEGS datasource.
     # Keys are `(dataset_id, scenario)`.
-    #
-    # NOTE: several datasets here (e.g. WelAuto/GeenAuto/GeenRijbewijs/Voorkeuren*) are
-    # indexed by *urbanization class*, not by zone. The code uses
-    # `with_car_segs[urbanization[zone]]`, so the first dimension corresponds to
-    # Stedelijkheidsgraad-1.
     segs = {
         # Per-zone average cars per household (used to derive free-car share).
         ("CBS_autos_per_huishouden", ""): np.array([0.5, 1.5]) * 100,
