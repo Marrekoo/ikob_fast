@@ -136,7 +136,7 @@ def _expected_laag_block_for_zone(
 
 
 def test_distribute_over_groups_computation(segs_capture):
-    from ikob.distribute_over_groups import distribute_groups_over_zones
+    from ikob.distribute_over_groups import distribute_population_over_groups
 
     # Prepare
     # The `segs` dict represents the in-memory contents of the SEGS datasource.
@@ -161,7 +161,7 @@ def test_distribute_over_groups_computation(segs_capture):
 
     config = _minimal_config()
     # Act
-    distribute_groups_over_zones(config)
+    distribute_population_over_groups(config)
 
     # Assert
     # distribute_over_groups should write a CSV for the computed distribution.
@@ -199,7 +199,7 @@ def test_distribution_of_income_group_is_independent_of_population_distribution(
     """
     The distribution of an income group over the groups is not related to how the total population is distributed among income groups.
     """
-    from ikob.distribute_over_groups import distribute_groups_over_zones
+    from ikob.distribute_over_groups import distribute_population_over_groups
 
     # Two zones identical in every way except income distribution.
     segs = {
@@ -214,7 +214,7 @@ def test_distribution_of_income_group_is_independent_of_population_distribution(
     }
     capture: SegsCapture = segs_capture(segs)
     config = _minimal_config()
-    distribute_groups_over_zones(config)
+    distribute_population_over_groups(config)
 
     writes = [w for w in capture.writes_csv if w["id"] == "Verdeling_over_groepen"]
     main = [w for w in writes if w["group"] == "Beroepsbevolking" and w["modifier"] == ""]
@@ -244,7 +244,7 @@ def test_distribution_of_groups_dependent_on_car_possession_correction_factor(se
     So a small 'CBS_autos_per_huishouden' achieves this state.
 
     """
-    from ikob.distribute_over_groups import distribute_groups_over_zones
+    from ikob.distribute_over_groups import distribute_population_over_groups
 
     # Two zones identical in every way except income distribution.
     segs = {
@@ -259,7 +259,7 @@ def test_distribution_of_groups_dependent_on_car_possession_correction_factor(se
     }
     capture: SegsCapture = segs_capture(segs)
     config = _minimal_config()
-    distribute_groups_over_zones(config)
+    distribute_population_over_groups(config)
 
     writes = [w for w in capture.writes_csv if w["id"] == "Verdeling_over_groepen"]
     main = [w for w in writes if w["group"] == "Beroepsbevolking" and w["modifier"] == ""]

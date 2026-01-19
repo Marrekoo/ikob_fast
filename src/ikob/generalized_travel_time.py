@@ -197,7 +197,7 @@ def generalized_travel_time(config) -> DataSource:
                             total_time = car_time_matrix[i][j]
                             total_cost = car_time_matrix[i][j] * time_costs_no_car.get(kind) + car_distance_matrix[i][
                                 j
-                            ] * (costs_no_car.get(kind) + road_pricing)
+                            ] * (costs_no_car.get(kind) + road_pricing_electric)
                             gtr_skim[i][j] = total_time + factor * total_cost
 
                     key = DataKey(id=f"{kind}", part_of_day=pod, income=income_level, motive=motive, regime=regime)
@@ -212,13 +212,13 @@ def generalized_travel_time(config) -> DataSource:
                             total_time = car_time_matrix[i][j] + parking_times[i][1] + parking_times[j][2]
                             if additional_costs:
                                 gtr_skim[i][j] = total_time + factor * (
-                                    car_distance_matrix[i][j] * road_pricing
+                                    car_distance_matrix[i][j] * road_pricing_electric
                                     + additional_cost_matrix[i][j] / 100
                                     + parking_cost_array[j] / 100
                                 )
                             else:
                                 gtr_skim[i][j] = total_time + factor * (
-                                    car_distance_matrix[i][j] * road_pricing + parking_cost_array[j] / 100
+                                    car_distance_matrix[i][j] * road_pricing_electric + parking_cost_array[j] / 100
                                 )
                     key = DataKey(id="GratisAuto", part_of_day=pod, income=income_level, motive=motive, regime=regime)
                     generalized_travel_time.set(key, gtr_skim.copy())

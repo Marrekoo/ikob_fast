@@ -8,9 +8,20 @@ from ikob.datasource import SegsSource, read_csv_from_config
 logger = logging.getLogger(__name__)
 
 
-def distribute_groups_over_zones(config):
+def distribute_population_over_groups(config):
     """
-    Distribute groups over zones
+    Distribute the population in each zone over a number of 'groups'
+
+    These groups refer to slices of the population who's mobility should be computed in their own way.
+    These groups are defined by:
+    - income class
+    - preference for a specific modality
+    - the level of access to a car (e.g. no car, no drivers license)
+    - the presence of a free modality (e.g. a free (company) car, or free public transport)
+
+    These group definitions are stored as strings. For example:
+    - WelAuto_GratisOV_middelhoog is the slice of the population with car, with free public transport, and a medium-high income (people with free pt always have pt as their preferred modality.
+    - GeenAuto_vkFiets_laag is the slice of the population with no car, a preference for transport by bike, and a low income.
 
     Corresponds to section B in IKOB-algorithm.pdf
 
@@ -108,6 +119,11 @@ def distribute_groups_over_zones(config):
             survey_per_income_class.append([])
             # First determine theoretical car and possessions.
             # See Step 1 in section B of IKOB-algorithm.pdf
+
+            # Car possession per income class (with_car) is computed from the theoretical car possession (with_car_share_theoretical) using a correction factor
+            # based on zone statistics on actual car possession per household and the theoretical car possession based on the income distribution and urbanization grade.
+            # First the correction factor is computed, then car possessions is computed per income class.
+
             car_possession_share = []
             for id, wc in zip(income_distribution, with_car_segs[urbanization[i]]):
                 car_possession_share.append(id * wc / 100)

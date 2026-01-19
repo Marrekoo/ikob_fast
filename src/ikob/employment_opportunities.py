@@ -222,7 +222,7 @@ def employment_opportunities(config, single_weights: DataSource, combined_weight
                     # This function does not explicitly group zones into regions or compute that weighted average.
                     # Instead, `Ontpl_totaalproduct` prepares the numerator term $B_{ihv} \cdot I_{ih}$ by
                     # multiplying the per-zone reachability by the (income-class) population per zone.
-                    # The denominator $\sum_{h \in r} I_{ih}$ would need to be applied in a later aggregation step.
+                    # The denominator $\sum_{h \in r} I_{ih}$ and the sum in the numerator would need to be applied in a later aggregation step.
 
                     general_possibility_totals_transposed = np.round(general_possibility_totals_transposed).astype(int)
                     key = DataKey(
