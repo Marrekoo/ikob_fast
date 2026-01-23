@@ -1,0 +1,231 @@
+import numpy as np
+
+
+def test_get_weight_matrix_auto_with_electric_ratio():
+    """Test that get_weight_matrix correctly blends fossil and electric car matrices."""
+    from ikob.competition import get_weight_matrix
+    from ikob.datasource import DataKey
+
+    fossil_matrix = np.array([[1.0, 2.0], [3.0, 4.0]])
+    electric_matrix = np.array([[10.0, 20.0], [30.0, 40.0]])
+
+    class MockWeights:
+        def get(self, key: DataKey):
+            if key.fuel_kind == "fossiel":
+                return fossil_matrix
+            elif key.fuel_kind == "elektrisch":
+                return electric_matrix
+            return None
+
+    single_weights = MockWeights()
+    combined_weights = MockWeights()
+
+    # Test with 30% electric ratio
+    result = get_weight_matrix(
+        single_weights,
+        combined_weights,
+        group="WelAuto_vkAuto_laag",
+        modality="Auto",
+        motive="werk",
+        regime="Basis",
+        part_of_day="Spits",
+        income="laag",
+        income_group="laag",
+        ratio_electric=0.3,
+    )
+
+    # Expected: 0.3 * electric + 0.7 * fossil
+    expected = 0.3 * electric_matrix + 0.7 * fossil_matrix
+    np.testing.assert_array_equal(result, expected)
+
+    # Test with 100% electric
+    result = get_weight_matrix(
+        single_weights,
+        combined_weights,
+        group="WelAuto_vkAuto_laag",
+        modality="Auto",
+        motive="werk",
+        regime="Basis",
+        part_of_day="Spits",
+        income="laag",
+        income_group="laag",
+        ratio_electric=1.0,
+    )
+    np.testing.assert_array_equal(result, electric_matrix)
+
+
+def test_get_weight_matrix_ov_modality():
+    """Test that get_weight_matrix handles OV (public transport) correctly."""
+    from ikob.competition import get_weight_matrix
+    from ikob.datasource import DataKey
+
+    single_matrix = np.array([[5, 6], [7, 8]])
+    combined_matrix = np.array([[99, 100], [101, 102]])
+
+    class MockSingleWeights:
+        def get(self, key: DataKey):
+            return single_matrix
+
+    class MockCombinedWeights:
+        def get(self, key: DataKey):
+            return combined_matrix
+
+    single_weights = MockSingleWeights()
+    combined_weights = MockCombinedWeights()
+
+    result = get_weight_matrix(
+        single_weights,
+        combined_weights,
+        group="GeenAuto_vkOV_laag",
+        modality="OV",
+        motive="werk",
+        regime="Basis",
+        part_of_day="Spits",
+        income="laag",
+        income_group="laag",
+        ratio_electric=0.0,
+    )
+    # OV modality should use single_weights
+    np.testing.assert_array_equal(result, single_matrix)
+
+
+def test_get_weight_matrix_combined_modality():
+    """Test that get_weight_matrix handles combined modalities correctly."""
+    from ikob.competition import get_weight_matrix
+    from ikob.datasource import DataKey
+
+    single_matrix = np.array([[1, 2], [3, 4]])
+    combined_matrix = np.array([[9, 10], [11, 12]])
+
+    class MockSingleWeights:
+        def get(self, key: DataKey):
+            return single_matrix
+
+    class MockCombinedWeights:
+        def get(self, key: DataKey):
+            return combined_matrix
+
+    single_weights = MockSingleWeights()
+    combined_weights = MockCombinedWeights()
+
+    # Test with combined modality like AutoOV (car + public transport)
+    result = get_weight_matrix(
+        single_weights,
+        combined_weights,
+        group="WelAuto_vkOV_laag",
+        modality="AutoOV",
+        motive="werk",
+        regime="Basis",
+        part_of_day="Spits",
+        income="laag",
+        income_group="laag",
+        ratio_electric=0.0,
+    )
+    # Combined modality should use combined_weights
+    np.testing.assert_array_equal(result, combined_matrix)
+
+
+def test_competition_on_jobs_per_capita_sensitivity(monkeypatch, segs_capture):
+    """Intended behavior: with identity reach, competition should scale with jobs per capita.
+
+    This is expected to FAIL if the implementation divides by an income *share* rather than
+    using absolute counts.
+    """
+
+    import ikob.competition as comp
+    from ikob.datasource import DataKey
+
+    # Prepare
+    pod = "Restdag"
+    motive = "werk"
+    regime = "Basis"
+
+    citizens_income = np.array(
+        [
+            [50.0, 50.0, 0.0, 0.0],
+            [100.0, 100.0, 0.0, 0.0],
+        ]
+    )
+    jobs_income_reachable = np.array(
+        [
+            [50.0, 0.0, 0.0, 0.0],
+            [25.0, 0.0, 0.0, 0.0],
+        ]
+    )
+    jobs_income_present = np.array(
+        [
+            [100.0, 0.0, 0.0, 0.0],
+            [100.0, 0.0, 0.0, 0.0],
+        ]
+    )
+
+    # Distribution matrix: 2 zones × 60; only one active group column.
+    distribution = np.zeros((2, 60), dtype=float)
+    distribution[0, 0] = 1.0
+    distribution[1, 0] = 0.75
+    distribution[1, 1] = 0.25
+
+    segs_capture(
+        {
+            ("Beroepsbevolking_inkomensklasse", "2023"): citizens_income,
+            ("Arbeidsplaatsen_inkomensklasse", "2023"): jobs_income_present,
+            ("Verdeling_over_groepen_Beroepsbevolking", "2023"): distribution,
+        }
+    )
+
+    identity = np.eye(2)
+    monkeypatch.setattr(comp, "get_weight_matrix", lambda *args, **kwargs: identity)
+    monkeypatch.setattr(comp.DataSource, "write_csv", lambda *args, **kwargs: None)
+    monkeypatch.setattr(comp.DataSource, "write_xlsx", lambda *args, **kwargs: None)
+
+    class _Origins:
+        def get(self, _key: DataKey):
+            # Reach of each zone to each zone
+            if _key.income == "laag":
+                return jobs_income_reachable[:, 0]
+            elif _key.income == "middellaag":
+                return jobs_income_reachable[:, 1]
+            elif _key.income == "middelhoog":
+                return jobs_income_reachable[:, 2]
+            elif _key.income == "hoog":
+                return jobs_income_reachable[:, 3]
+
+    class _Weights:
+        def get(self, _key):
+            return identity
+
+    config = {
+        "__filename__": "pytest",
+        "project": {
+            "verstedelijkingsscenario": "2023",
+            "beprijzingsregime": regime,
+            "motieven": [motive],
+            "paden": {
+                "output_directory": "out",
+                "skims_directory": "skims",
+                "segs_directory": "segs",
+            },
+        },
+        "skims": {"dagsoort": [pod]},
+        "verdeling": {"Percelektrisch": {"laag": 0.0, "middellaag": 0.0, "middelhoog": 0.0, "hoog": 0.0}},
+        "geavanceerd": {"welke_groepen": ["alle groepen"]},
+    }
+
+    # Act
+    competitions = comp.competition_on_jobs(config, _Weights(), _Weights(), _Origins())
+
+    # Assert
+
+    key = DataKey(
+        id="Totaal",
+        part_of_day=pod,
+        subtopic="arbeidsplaatsen",
+        income="laag",
+        motive=motive,
+        modality="Auto",
+    )
+    total = competitions.get(key)
+
+    # Intended per-capita behavior under identity reach: jobs_low / citizens_low.
+    expected = jobs_income_present[:, 0] / jobs_income_reachable[:, 0]
+    np.testing.assert_allclose(total, expected)
