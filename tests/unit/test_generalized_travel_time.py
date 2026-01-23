@@ -116,10 +116,9 @@ def setup_generalized_travel_time_input(monkeypatch, gtt):
     return (config, pod, regime, motive, income, car_time, car_dist, bike_time, pt_time, pt_dist, parking_times)
 
 
-def test_generalized_travel_time_small_deterministic_no_additional_no_parking(monkeypatch):
+def test_generalized_travel_time_fiets(monkeypatch):
     import ikob.generalized_travel_time as gtt
     from ikob.datasource import DataKey
-    from ikob.generalized_travel_time import costs_public_transport
 
     config, pod, regime, motive, income, car_time, car_dist, bike_time, pt_time, pt_dist, parking_times = (
         setup_generalized_travel_time_input(monkeypatch, gtt)
@@ -131,6 +130,18 @@ def test_generalized_travel_time_small_deterministic_no_additional_no_parking(mo
     fiets = datasource.get(fiets_key)
     expected_fiets = np.where(bike_time < 180, bike_time, 9999)
     np.testing.assert_allclose(fiets, expected_fiets)
+
+
+def test_generalized_travel_time_public_transport(monkeypatch):
+    import ikob.generalized_travel_time as gtt
+    from ikob.datasource import DataKey
+    from ikob.generalized_travel_time import costs_public_transport
+
+    config, pod, regime, motive, income, car_time, car_dist, bike_time, pt_time, pt_dist, parking_times = (
+        setup_generalized_travel_time_input(monkeypatch, gtt)
+    )
+
+    datasource = gtt.generalized_travel_time(config)
 
     pt_key = DataKey(id="OV", part_of_day=pod, income=income, motive=motive, regime=regime)
     pt = datasource.get(pt_key)
@@ -150,10 +161,32 @@ def test_generalized_travel_time_small_deterministic_no_additional_no_parking(mo
     expected_pt = np.where(pt_time > 0.5, expected_pt, 9999)
     np.testing.assert_allclose(pt, expected_pt)
 
+
+def test_generalized_travel_time_free_public_transport(monkeypatch):
+    import ikob.generalized_travel_time as gtt
+    from ikob.datasource import DataKey
+
+    config, pod, regime, motive, income, car_time, car_dist, bike_time, pt_time, pt_dist, parking_times = (
+        setup_generalized_travel_time_input(monkeypatch, gtt)
+    )
+
+    datasource = gtt.generalized_travel_time(config)
+
     free_pt_key = DataKey(id="GratisOV", part_of_day=pod, motive=motive, regime=regime)
     free_pt = datasource.get(free_pt_key)
     expected_free_pt = np.where(pt_time > 0.5, pt_time, 9999)
     np.testing.assert_allclose(free_pt, expected_free_pt)
+
+
+def test_generalized_travel_time_auto_fossiel(monkeypatch):
+    import ikob.generalized_travel_time as gtt
+    from ikob.datasource import DataKey
+
+    config, pod, regime, motive, income, car_time, car_dist, bike_time, pt_time, pt_dist, parking_times = (
+        setup_generalized_travel_time_input(monkeypatch, gtt)
+    )
+
+    datasource = gtt.generalized_travel_time(config)
 
     auto_key = DataKey(id="Auto_fossiel", part_of_day=pod, income=income, regime=regime, motive=motive)
     auto = datasource.get(auto_key)
@@ -177,6 +210,17 @@ def test_generalized_travel_time_small_deterministic_no_additional_no_parking(mo
     )
     np.testing.assert_allclose(auto, expected_auto)
 
+
+def test_generalized_travel_time_geen_auto(monkeypatch):
+    import ikob.generalized_travel_time as gtt
+    from ikob.datasource import DataKey
+
+    config, pod, regime, motive, income, car_time, car_dist, bike_time, pt_time, pt_dist, parking_times = (
+        setup_generalized_travel_time_input(monkeypatch, gtt)
+    )
+
+    datasource = gtt.generalized_travel_time(config)
+
     no_car_key = DataKey(id="GeenAuto", part_of_day=pod, income=income, motive=motive, regime=regime)
     no_car = datasource.get(no_car_key)
     # total_cost = time * tijdkost + distance * (varkost + kmheffing)
@@ -189,6 +233,17 @@ def test_generalized_travel_time_small_deterministic_no_additional_no_parking(mo
         )
     )
     np.testing.assert_allclose(no_car, expected_no_car)
+
+
+def test_generalized_travel_time_geen_rijbewijs(monkeypatch):
+    import ikob.generalized_travel_time as gtt
+    from ikob.datasource import DataKey
+
+    config, pod, regime, motive, income, car_time, car_dist, bike_time, pt_time, pt_dist, parking_times = (
+        setup_generalized_travel_time_input(monkeypatch, gtt)
+    )
+
+    datasource = gtt.generalized_travel_time(config)
 
     no_license_key = DataKey(id="GeenRijbewijs", part_of_day=pod, income=income, motive=motive, regime=regime)
     no_license = datasource.get(no_license_key)

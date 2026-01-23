@@ -92,10 +92,9 @@ def test_potential_companies_totals(potential_companies_setup):
     """Reachable citizens (potential workforce) totals are independent of job counts and distribution over groups."""
     from ikob.datasource import DataKey
 
-    setup = potential_companies_setup
-    origins = setup["origins"]
-    pod = setup["pod"]
-    motive = setup["motive"]
+    origins = potential_companies_setup["origins"]
+    pod = potential_companies_setup["pod"]
+    motive = potential_companies_setup["motive"]
 
     key = DataKey(
         "Totaal",
@@ -115,10 +114,9 @@ def test_potential_companies_totals(potential_companies_setup):
 def test_potential_companies_pot_totaal(potential_companies_setup):
     """Pot_totaal xlsx output shows reachability by income group, independent of distribution over groups."""
 
-    setup = potential_companies_setup
-    xlsx_writes = setup["xlsx_writes"]
-    working_pop_income = setup["working_pop_income"]
-    jobs_income = setup["jobs_income"]
+    xlsx_writes = potential_companies_setup["xlsx_writes"]
+    working_pop_income = potential_companies_setup["working_pop_income"]
+    jobs_income = potential_companies_setup["jobs_income"]
 
     # Test Pot_totaal xlsx write (per modality, showing reachability by income group)
     pot_totaal_writes = [w for w in xlsx_writes if w["key"].id == "Pot_totaal" and w["key"].modality == "Auto"]

@@ -4,6 +4,7 @@ import pytest
 
 class SegsCapture:
     """Test double for SegsSource that captures reads and writes in memory."""
+
     def __init__(self, data_by_key):
         self.data_by_key = data_by_key
         self.writes_csv = []
@@ -59,11 +60,11 @@ def segs_capture(monkeypatch):
 
         capture = SegsCapture(data_by_key)
 
-        monkeypatch.setattr(datasource, "SegsSource", lambda _config: capture)
-        monkeypatch.setattr(distribute_over_groups, "SegsSource", lambda _config: capture)
-        monkeypatch.setattr(employment_opportunities, "SegsSource", lambda _config: capture)
-        monkeypatch.setattr(potential_companies, "SegsSource", lambda _config: capture)
-        monkeypatch.setattr(competition, "SegsSource", lambda _config: capture)
+        monkeypatch.setattr(datasource, "SegsSource", lambda _: capture)
+        monkeypatch.setattr(distribute_over_groups, "SegsSource", lambda _: capture)
+        monkeypatch.setattr(employment_opportunities, "SegsSource", lambda _: capture)
+        monkeypatch.setattr(potential_companies, "SegsSource", lambda _: capture)
+        monkeypatch.setattr(competition, "SegsSource", lambda _: capture)
         return capture
 
     return _make

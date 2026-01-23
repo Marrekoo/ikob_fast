@@ -2,8 +2,7 @@ import pathlib
 import shutil
 
 from ikob.chain_generator import chain_generator
-
-from ..e2e.test_end_to_end import compare_directories
+from tests.e2e.test_end_to_end import compare_directories
 
 
 def test_chain_generator(tmpdir):

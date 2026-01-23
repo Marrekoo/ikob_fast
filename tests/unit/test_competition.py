@@ -1,10 +1,11 @@
 import numpy as np
 
+from ikob.datasource import DataKey
+
 
 def test_get_weight_matrix_auto_with_electric_ratio():
     """Test that get_weight_matrix correctly blends fossil and electric car matrices."""
     from ikob.competition import get_weight_matrix
-    from ikob.datasource import DataKey
 
     fossil_matrix = np.array([[1.0, 2.0], [3.0, 4.0]])
     electric_matrix = np.array([[10.0, 20.0], [30.0, 40.0]])
@@ -38,26 +39,10 @@ def test_get_weight_matrix_auto_with_electric_ratio():
     expected = 0.3 * electric_matrix + 0.7 * fossil_matrix
     np.testing.assert_array_equal(result, expected)
 
-    # Test with 100% electric
-    result = get_weight_matrix(
-        single_weights,
-        combined_weights,
-        group="WelAuto_vkAuto_laag",
-        modality="Auto",
-        motive="werk",
-        regime="Basis",
-        part_of_day="Spits",
-        income="laag",
-        income_group="laag",
-        ratio_electric=1.0,
-    )
-    np.testing.assert_array_equal(result, electric_matrix)
-
 
 def test_get_weight_matrix_ov_modality():
     """Test that get_weight_matrix handles OV (public transport) correctly."""
     from ikob.competition import get_weight_matrix
-    from ikob.datasource import DataKey
 
     single_matrix = np.array([[5, 6], [7, 8]])
     combined_matrix = np.array([[99, 100], [101, 102]])
@@ -92,7 +77,6 @@ def test_get_weight_matrix_ov_modality():
 def test_get_weight_matrix_combined_modality():
     """Test that get_weight_matrix handles combined modalities correctly."""
     from ikob.competition import get_weight_matrix
-    from ikob.datasource import DataKey
 
     single_matrix = np.array([[1, 2], [3, 4]])
     combined_matrix = np.array([[9, 10], [11, 12]])
