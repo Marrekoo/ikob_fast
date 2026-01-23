@@ -2,10 +2,52 @@ import itertools
 import logging
 
 import numpy as np
+import numpy.typing as npt
 
 from ikob.datasource import SegsSource, read_csv_from_config
 
 logger = logging.getLogger(__name__)
+
+
+def _validate_car_possession_segs(
+    with_car_segs: npt.NDArray[np.integer],
+    no_car_segs: npt.NDArray[np.integer],
+    no_license_segs: npt.NDArray[np.integer],
+    income_levels: list[str],
+):
+    """
+    Validate that WelAuto, GeenAuto, and GeenRijbewijs sum to 100
+    for each urbanization grade and income class
+
+    These three categories should represent the complete population (those with a car,
+    those without a car but with a license, and those without a license), so they must
+    sum to 100%.
+
+    Since the percentages are rounded to integers, a valid sum may equal either 99 or 100.
+
+    Args:
+        with_car_segs: WelAuto SEGS data (urbanization grades x income classes)
+        no_car_segs: GeenAuto SEGS data (urbanization grades x income classes)
+        no_license_segs: GeenRijbewijs SEGS data (urbanization grades x income classes)
+        income_levels: List of income level names for logging
+    """
+    for urb_idx in range(len(with_car_segs)):
+        for income_idx in range(len(income_levels)):
+            total = (
+                with_car_segs[urb_idx][income_idx]
+                + no_car_segs[urb_idx][income_idx]
+                + no_license_segs[urb_idx][income_idx]
+            )
+            if total != 99 and total != 100:  # Allow rounding errors
+                logger.warning(
+                    f"SEGS data validation warning: For urbanization grade {urb_idx + 1}, "
+                    f"income class '{income_levels[income_idx]}', "
+                    f"WelAuto + GeenAuto + GeenRijbewijs = {total} (expected ~100). "
+                    f"Values: WelAuto={with_car_segs[urb_idx][income_idx]}, "
+                    f"GeenAuto={no_car_segs[urb_idx][income_idx]}, "
+                    f"GeenRijbewijs={no_license_segs[urb_idx][income_idx]}. "
+                    f"This may lead to incorrect distribution calculations."
+                )
 
 
 def distribute_population_over_groups(config):
@@ -67,6 +109,10 @@ def distribute_population_over_groups(config):
     no_license_segs = segs_source.read("GeenRijbewijs")
     no_car_segs = segs_source.read("GeenAuto")
     with_car_segs = segs_source.read("WelAuto")
+
+    # Validate that the car possession data is consistent
+    _validate_car_possession_segs(with_car_segs, no_car_segs, no_license_segs, income_levels)
+
     # Tables 6-7 of IKOB-algorithm.pdf
     preferences_segs = segs_source.read("Voorkeuren")
     preferences_no_car_segs = segs_source.read("VoorkeurenGeenAuto")

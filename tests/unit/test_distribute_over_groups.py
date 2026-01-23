@@ -177,14 +177,14 @@ def test_distribute_over_groups_computation(segs_capture):
     assert data.shape == (2, 60)  # 2 zones, 60 group categories.
 
     # The total distribution of the population over all groups sums to 1 per zone.
-    np.testing.assert_allclose(data.sum(axis=1), np.ones(2), rtol=1e-7, atol=1e-7)
+    np.testing.assert_allclose(data.sum(axis=1), np.ones(2))
 
     # Each income block is a partition of that income's population share.
     # In this fixture, each income class has equal weight: 0.25.
     for income_block in range(4):
         start = income_block * 15
         end = start + 15
-        np.testing.assert_allclose(data[0, start:end].sum(), 0.25, rtol=1e-12, atol=1e-12)
+        np.testing.assert_allclose(data[0, start:end].sum(), 0.25)
 
     # Assert every output value for income class 'laag' (the first 15 columns)
     # using the same calculations as the implementation.
@@ -192,7 +192,7 @@ def test_distribute_over_groups_computation(segs_capture):
     expected_laag_zone0 = _expected_laag_block_for_zone(
         zone_index=0, segs=segs, free_pt_percentage=config["verdeling"]["GratisOVpercentage"]
     )
-    np.testing.assert_allclose(data[0, :15], expected_laag_zone0, rtol=1e-12, atol=1e-12)
+    np.testing.assert_allclose(data[0, :15], expected_laag_zone0)
 
 
 def test_distribution_of_income_group_is_independent_of_population_distribution(segs_capture):
@@ -202,11 +202,12 @@ def test_distribution_of_income_group_is_independent_of_population_distribution(
     from ikob.distribute_over_groups import distribute_population_over_groups
 
     # Two zones identical in every way except income distribution.
+    # Note: WelAuto, GeenAuto, GeenRijbewijs must sum to 100 for each income class.
     segs = {
         ("CBS_autos_per_huishouden", ""): np.array([0.8, 0.8]) * 100,
         ("Stedelijkheidsgraad", ""): np.array([1, 1]),
-        ("GeenRijbewijs", ""): np.array([[10, 10, 10, 10], [10, 10, 10, 10]]),
-        ("GeenAuto", ""): np.array([[10, 10, 10, 10], [10, 10, 10, 10]]),
+        ("GeenRijbewijs", ""): np.array([[40, 10, 10, 10], [40, 10, 10, 10]]),
+        ("GeenAuto", ""): np.array([[50, 10, 10, 10], [50, 10, 10, 10]]),
         ("WelAuto", ""): np.array([[10, 80, 80, 80], [10, 80, 80, 80]]),
         ("Voorkeuren", ""): np.array([[25, 25, 25, 25], [25, 25, 25, 25]]),
         ("VoorkeurenGeenAuto", ""): np.array([[34, 33, 33], [34, 33, 33]]),
@@ -228,8 +229,21 @@ def test_distribution_of_income_group_is_independent_of_population_distribution(
 
     # The normalized distribution within the income group should be identical
     # regardless of how the total population is distributed across income classes.
-    np.testing.assert_allclose(laag_dist_zone0, laag_dist_zone1, rtol=1e-12, atol=1e-12)
-    np.testing.assert_allclose(hoog_dist_zone0, hoog_dist_zone1, rtol=1e-12, atol=1e-12)
+    np.testing.assert_allclose(laag_dist_zone0, laag_dist_zone1)
+    np.testing.assert_allclose(hoog_dist_zone0, hoog_dist_zone1)
+
+    # It's also true that the sizes of all the groups belonging to a single income group should sum to the to the size of the income group in the total population
+    np.testing.assert_allclose(data.sum(axis=1), np.ones(2))
+    np.testing.assert_allclose(
+        data[0, 0:15].sum(),
+        segs[("Beroepsbevolking_inkomensklasse", "2023")][0][0]
+        / segs[("Beroepsbevolking_inkomensklasse", "2023")][0].sum(),
+    )
+    np.testing.assert_allclose(
+        data[1, 0:15].sum(),
+        segs[("Beroepsbevolking_inkomensklasse", "2023")][1][0]
+        / segs[("Beroepsbevolking_inkomensklasse", "2023")][1].sum(),
+    )
 
 
 def test_distribution_of_groups_dependent_on_car_possession_correction_factor(segs_capture):
@@ -247,11 +261,12 @@ def test_distribution_of_groups_dependent_on_car_possession_correction_factor(se
     from ikob.distribute_over_groups import distribute_population_over_groups
 
     # Two zones identical in every way except income distribution.
+    # Note: WelAuto, GeenAuto, GeenRijbewijs must sum to 100 for each income class.
     segs = {
         ("CBS_autos_per_huishouden", ""): np.array([0.05, 0.05]) * 100,
         ("Stedelijkheidsgraad", ""): np.array([1, 1]),
-        ("GeenRijbewijs", ""): np.array([[10, 10, 10, 10], [10, 10, 10, 10]]),
-        ("GeenAuto", ""): np.array([[10, 10, 10, 10], [10, 10, 10, 10]]),
+        ("GeenRijbewijs", ""): np.array([[40, 10, 10, 10], [40, 10, 10, 10]]),
+        ("GeenAuto", ""): np.array([[50, 10, 10, 10], [50, 10, 10, 10]]),
         ("WelAuto", ""): np.array([[10, 80, 80, 80], [10, 80, 80, 80]]),
         ("Voorkeuren", ""): np.array([[25, 25, 25, 25], [25, 25, 25, 25]]),
         ("VoorkeurenGeenAuto", ""): np.array([[34, 33, 33], [34, 33, 33]]),
@@ -273,5 +288,18 @@ def test_distribution_of_groups_dependent_on_car_possession_correction_factor(se
 
     # The normalized distribution within the income group should be identical
     # regardless of how the total population is distributed across income classes.
-    assert np.abs(laag_dist_zone0 - laag_dist_zone1).sum() > 1e-6
-    assert np.abs(hoog_dist_zone0 - hoog_dist_zone1).sum() > 1e-6
+    np.testing.assert_raises(AssertionError, np.testing.assert_allclose, laag_dist_zone0, laag_dist_zone1)
+    np.testing.assert_raises(AssertionError, np.testing.assert_allclose, hoog_dist_zone0, hoog_dist_zone1)
+
+    # It's also true that the sizes of all the groups belonging to a single income group should sum to the to the size of the income group in the total population
+    np.testing.assert_allclose(data.sum(axis=1), np.ones(2))
+    np.testing.assert_allclose(
+        data[0, 0:15].sum(),
+        segs[("Beroepsbevolking_inkomensklasse", "2023")][0][0]
+        / segs[("Beroepsbevolking_inkomensklasse", "2023")][0].sum(),
+    )
+    np.testing.assert_allclose(
+        data[1, 0:15].sum(),
+        segs[("Beroepsbevolking_inkomensklasse", "2023")][1][0]
+        / segs[("Beroepsbevolking_inkomensklasse", "2023")][1].sum(),
+    )
