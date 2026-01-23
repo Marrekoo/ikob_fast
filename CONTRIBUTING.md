@@ -42,56 +42,68 @@ Documentation improvements are always welcome! This includes:
 - Adding examples
 - Clarifying confusing sections
 
+### 💻 Development
+
+To get your changes accepted into the ikob repo, first open an issue for discussion.
+
 ## Development Setup
 
-### Prerequisites
+### Getting started **without** push access to IKOB repo
 
-- python 3.13.1+
-- Git
+Follow the instructions in the readme under [Installation and usage (manual installation)](README.md#installation-and-usage). \
+Instead of cloning the IKOB repo directly, first create a fork and clone that repo.
 
-### Getting Started
+1. Add upstream remote.
+   ```bash
+   git remote add upstream https://github.com/Stichting-CROW/ikob.git
+   ```
 
- 1. Fork the repository on GitHub. \
-If you have push access to the IKOB repository you can skip this step, clone the original repo and work in there.
+2. Create a branch for your changes
 
- 2. Clone your fork locally
-```bash
-git clone https://github.com/YOUR_USERNAME/ikob.git
-cd [project-name]
-```
-3. Add upstream remote.\
-If you have push access, it's also not necessary to add an upstream remote, just use origin.
-```bash
-git remote add upstream https://github.com/Stichting-CROW/ikob.git
-```
-4. Create a branch for your changes
-```bash
-git checkout -b feature/your-feature-name
-```
-5. Setup development environment, see the [Development section](README.md#development) in the readme
+3. Setup development environment, see the [Development section](README.md#development) in the readme
 
-6. push your changes locally
-```bash
-git push -u origin feature/your-feature-name
-```
+4. push your changes to the fork
 
-7. Create a pull request with 'compare across forks' on GitHub
+
+5. Create a pull request against the master branch with 'compare across forks' on GitHub. See [Pull Request Process](#pull-request-process).
+
+6. Wait for review
+
+### Getting started **with** push acces to IKOB repo
+Follow the instructions in the readme under [Installation and usage (manual installation)](README.md#installation-and-usage)
+
+1. Create an issue or find an existing issue related to your work
+
+2. From within the issue, create a branch for your changes
+
+3. Fetch the new branch and switch to it
+
+4. Push your work and open a PR linked to the branch. See [Pull Request Process](#pull-request-process).
+
+5. Wait for review
 
 ## Pull Request Process
 
 ### Before Submitting
 
-0. Know that your PR has a much better chance of being accepted if you **open an issue first** for discussion.
+0. **Open an issue first** for discussion.
 
-1. **Update your branch** with the latest upstream changes:
+1. **Update your branch** with the latest upstream changes: \
+   From a fork:
    ```bash
    git fetch upstream
-   git merge upstream/main
+   git merge upstream/master
    ```
+   From the ikob repo:
+   ```bash
+   git fetch origin
+   git merge origin/master
+   ```
+
 
 2. **format your code**
    ```bash
-   ruff format .
+   python -m ruff format .
    ```
 
 3. **Run the full test suite** and ensure all tests pass:
@@ -99,22 +111,13 @@ git push -u origin feature/your-feature-name
    pytest .
    ```
 
-### Submitting
 
-1. Push your branch to your fork:
-   ```bash
-   git push origin feature/your-feature-name
-   ```
-
-2. Open a Pull Request against the `master` branch.
-
-3. Wait for review.
 
 ### PR Checklist
 
 - [ ] My code follows the project's [style guidelines](#style-guide)
 - [ ] I have performed a self-review of my own code
-- [ ] I have commented my code, particularly in hard-to-understand areas and focussing on _why_ the code is the way is it over _what_ the code doing. _What_ should ideally be clear from the code itself.
+- [ ] I have commented my code, particularly in hard-to-understand areas and focusing on _why_ the code is the way it is over _what_ the code doing. _What_ should ideally be clear from the code itself.
 - [ ] I have added tests that prove my fix is effective or that my feature works
 - [ ] New and existing unit tests pass with my changes
 
