@@ -1,4 +1,4 @@
-import numpy as np
+import pytest
 
 
 def test_has_preference_rules():
@@ -17,7 +17,33 @@ def test_has_preference_rules():
     assert has_preference(kind_car="Auto", kind_pt="GratisOV", preference="Auto") is False
 
 
-def test_calculate_combined_weights_takes_elementwise_max():
+@pytest.mark.parametrize(
+    ("modality_key", "modalities", "preference", "income", "fuel_kind"),
+    [
+        # First all combinations of two modalities (with electric and fossil cars separate)
+        ("Auto_OV_vk", ["car", "pt"], "Neutraal", "laag", "fossiel"),
+        ("Auto_OV_vk", ["car", "pt"], "Neutraal", "laag", "elektrisch"),
+        ("OV_Fiets_vk", ["bike", "pt"], "Neutraal", "laag", None),
+        ("Auto_Fiets_vk", ["bike", "car"], "Neutraal", "laag", "fossiel"),
+        ("Auto_Fiets_vk", ["bike", "car"], "Neutraal", "laag", "elektrisch"),
+        ("Auto_OV_Fiets_vk", ["car", "pt", "bike"], "Neutraal", "laag", "fossiel"),
+        ("Auto_OV_Fiets_vk", ["car", "pt", "bike"], "Neutraal", "laag", "elektrisch"),
+        # Then try different car kinds (no car / free car / etc.)
+        ("GeenAuto_Fiets_vk", ["bike", "car"], "Neutraal", "middelhoog", None),
+        ("GratisAuto_OV_vk", ["car", "pt"], "Auto", "middellaag", None),
+        ("GeenRijbewijs_OV_vk", ["car", "pt"], "Neutraal", "laag", None),
+        # Then try different pt kinds
+        ("GratisOV_Fiets_vk", ["bike", "pt"], "OV", "hoog", None),
+        # And finally different preferences
+        ("Auto_OV_Fiets_vk", ["car", "pt", "bike"], "OV", "laag", "fossiel"),
+        ("Auto_OV_Fiets_vk", ["car", "pt", "bike"], "Auto", "laag", "fossiel"),
+        ("Auto_OV_Fiets_vk", ["car", "pt", "bike"], "Fiets", "laag", "fossiel"),
+    ],
+)
+def test_combined_modalities_use_elementwise_max(modality_key, modalities, preference, income, fuel_kind):
+    """Test that combined modalities compute the elementwise maximum of their component modalities."""
+    import numpy as np
+
     import ikob.combined_weights as cw
     from ikob.datasource import DataKey
 
@@ -26,29 +52,23 @@ def test_calculate_combined_weights_takes_elementwise_max():
     motive = "werk"
     regime = "Basis"
 
-    bike = np.array([[1.0, 1.0], [1.0, 1.0]])
-    pt = np.array([[2.0, 0.0], [0.0, 2.0]])
-    car = np.array([[0.5, 3.0], [3.0, 0.5]])
+    bike = np.array([[1.0, 0.0], [0.0, 0.0]])
+    pt = np.array([[0.0, 1.0], [0.0, 0.0]])
+    car_fossil = np.array([[0.0, 0.0], [1.0, 0.0]])
+    car_electric = np.array([[0.0, 0.0], [0.0, 1.0]])
+    car = car_fossil if fuel_kind == "fossiel" else car_electric
 
     class _FakeSingleWeights:
         def get(self, key: DataKey):
-            # calculate_combined_weights requests many combinations across:
-            # - incomes (4)
-            # - preferences (4)
-            # - pt kinds (OV, GratisOV)
-            # - car kinds (Auto, GeenAuto, GeenRijbewijs, GratisAuto)
-            # - fuels for Auto
-            # For this unit test we only care that the combinator uses elementwise max,
-            # so we return simple matrices by broad category.
             if key.id == "Fiets_vk":
                 return bike
-
             if key.id in {"OV_vk", "GratisOV_vk"}:
                 return pt
-
             if key.id in {"Auto_vk", "GeenAuto_vk", "GeenRijbewijs_vk", "GratisAuto_vk"}:
-                return car
-
+                if key.fuel_kind == "fossiel":
+                    return car_fossil
+                else:
+                    return car_electric
             raise KeyError(key)
 
     config = {
@@ -69,18 +89,24 @@ def test_calculate_combined_weights_takes_elementwise_max():
     combined = cw.calculate_combined_weights(config, _FakeSingleWeights())
 
     # Assert
-    # Example: Auto_OV_vk is computed as max(Auto_vk, OV_vk) for each cell.
-    key = DataKey(
-        "Auto_OV_vk",
-        part_of_day=pod,
-        income="laag",
-        regime=regime,
-        motive=motive,
-        preference="OV",
-        subtopic="combinaties",
-        fuel_kind="fossiel",
-    )
+    key_params = {
+        "part_of_day": pod,
+        "income": income,
+        "regime": regime,
+        "motive": motive,
+        "preference": preference,
+        "subtopic": "combinaties",
+    }
+    if fuel_kind:
+        key_params["fuel_kind"] = fuel_kind
 
+    key = DataKey(modality_key, **key_params)
     out = combined.get(key)
-    expected = np.maximum(pt, car)
+
+    # Map modality names to matrices
+    modality_matrices = {"bike": bike, "pt": pt, "car": car}
+    matrices_to_max = [modality_matrices[m] for m in modalities]
+
+    expected = np.maximum.reduce(matrices_to_max)
+
     np.testing.assert_allclose(out, expected)
