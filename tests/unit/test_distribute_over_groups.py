@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from tests.unit.conftest import SegsCapture
 
@@ -24,43 +25,42 @@ def _minimal_config():
     }
 
 
-def _expected_laag_header_prefix() -> list[str]:
+def _expected_header(income_group: str) -> list[str]:
     return [
-        "GratisAuto_laag",
-        "GratisAuto_GratisOV_laag",
-        "WelAuto_GratisOV_laag",
-        "WelAuto_vkAuto_laag",
-        "WelAuto_vkNeutraal_laag",
-        "WelAuto_vkFiets_laag",
-        "WelAuto_vkOV_laag",
-        "GeenAuto_GratisOV_laag",
-        "GeenAuto_vkNeutraal_laag",
-        "GeenAuto_vkFiets_laag",
-        "GeenAuto_vkOV_laag",
-        "GeenRijbewijs_GratisOV_laag",
-        "GeenRijbewijs_vkNeutraal_laag",
-        "GeenRijbewijs_vkFiets_laag",
-        "GeenRijbewijs_vkOV_laag",
+        f"GratisAuto_{income_group}",
+        f"GratisAuto_GratisOV_{income_group}",
+        f"WelAuto_GratisOV_{income_group}",
+        f"WelAuto_vkAuto_{income_group}",
+        f"WelAuto_vkNeutraal_{income_group}",
+        f"WelAuto_vkFiets_{income_group}",
+        f"WelAuto_vkOV_{income_group}",
+        f"GeenAuto_GratisOV_{income_group}",
+        f"GeenAuto_vkNeutraal_{income_group}",
+        f"GeenAuto_vkFiets_{income_group}",
+        f"GeenAuto_vkOV_{income_group}",
+        f"GeenRijbewijs_GratisOV_{income_group}",
+        f"GeenRijbewijs_vkNeutraal_{income_group}",
+        f"GeenRijbewijs_vkFiets_{income_group}",
+        f"GeenRijbewijs_vkOV_{income_group}",
     ]
 
 
-def _expected_laag_block_for_zone(
+def _expected_block(
     *,
     zone_index: int,
+    income_index: int,
     segs: dict[tuple[str, str], np.ndarray],
     free_pt_percentage: float,
     scenario: str = "2023",
 ) -> np.ndarray:
-    """Compute expected 15 output values for income class 'laag' for a zone.
+    """Compute expected output values for income class 'laag' for a zone.
 
     This mirrors the calculations in `ikob.distribute_over_groups.distribute_over_groups`.
     It's not ideal that the test in part reimplements the same logic as the code under test, but still the tested code is significantly more obtuse.
     """
 
-    income_index = 0  # 'laag'
-
     # Fixed values from the implementation.
-    free_car_per_income = [0]  # only 'laag' is relevant here.
+    free_car_per_income = [0, 0.02, 0.175, 0.275]
     preferences = ["Auto", "Neutraal", "Fiets", "OV"]
     preferences_no_car = ["Neutraal", "Fiets", "OV"]
 
@@ -131,11 +131,14 @@ def _expected_laag_block_for_zone(
         share_pref = no_license * (1 - free_pt_percentage) * (preferences_no_car_segs[urb][i_pref] / 100)
         out.append(share_pref * income_share_of_population)
 
-    assert len(out) == 15
     return np.array(out, dtype=float)
 
 
-def test_distribute_over_groups_computation(segs_capture):
+@pytest.mark.parametrize("zone_index", (0, 1))
+@pytest.mark.parametrize(
+    ("income_group", "income_index"), (("laag", 0), ("middellaag", 1), ("middelhoog", 2), ("hoog", 3))
+)
+def test_distribute_over_groups_computation(zone_index, income_group, income_index, segs_capture):
     from ikob.distribute_over_groups import distribute_population_over_groups
 
     # Prepare
@@ -174,25 +177,31 @@ def test_distribute_over_groups_computation(segs_capture):
     data = main[0]["data"]
     header = main[0]["header"]
 
-    assert data.shape == (2, 60)  # 2 zones, 60 group categories.
+    # 2 zones, 60 group categories. The total number of groups over which the population is distributed is 60.
+    assert data.shape == (2, 60)
 
     # The total distribution of the population over all groups sums to 1 per zone.
     np.testing.assert_allclose(data.sum(axis=1), np.ones(2))
 
     # Each income block is a partition of that income's population share.
-    # In this fixture, each income class has equal weight: 0.25.
-    for income_block in range(4):
-        start = income_block * 15
+    # The 60 total groups can be split up in 4 sections of 15 groups belonging to each income group.
+    # With these segs, each income class has equal is an equal share of the total population: 0.25.
+    for income_group_i in range(4):
+        start = income_group_i * 15
         end = start + 15
         np.testing.assert_allclose(data[0, start:end].sum(), 0.25)
 
-    # Assert every output value for income class 'laag' (the first 15 columns)
+    # Assert every output value for the income group
     # using the same calculations as the implementation.
-    assert header[:15] == _expected_laag_header_prefix()
-    expected_laag_zone0 = _expected_laag_block_for_zone(
-        zone_index=0, segs=segs, free_pt_percentage=config["verdeling"]["GratisOVpercentage"]
+    income_slice = slice(income_index * 15, (income_index + 1) * 15)
+    assert header[income_slice] == _expected_header(income_group)
+    expected_laag_zone0 = _expected_block(
+        zone_index=zone_index,
+        income_index=income_index,
+        segs=segs,
+        free_pt_percentage=config["verdeling"]["GratisOVpercentage"],
     )
-    np.testing.assert_allclose(data[0, :15], expected_laag_zone0)
+    np.testing.assert_allclose(data[zone_index, income_slice], expected_laag_zone0)
 
 
 def test_distribution_of_income_group_is_independent_of_population_distribution(segs_capture):
@@ -223,8 +232,9 @@ def test_distribution_of_income_group_is_independent_of_population_distribution(
 
     # Normalize the 'laag' income group distribution (columns 0-15) for each zone.
     laag_dist_zone0 = data[0, 0:15] / data[0, 0:15].sum()
-    hoog_dist_zone0 = data[0, 45:60] / data[0, 45:60].sum()
     laag_dist_zone1 = data[1, 0:15] / data[1, 0:15].sum()
+    # Do the same for 'high' income group distribution (column 45-60)
+    hoog_dist_zone0 = data[0, 45:60] / data[0, 45:60].sum()
     hoog_dist_zone1 = data[1, 45:60] / data[1, 45:60].sum()
 
     # The normalized distribution within the income group should be identical
@@ -282,8 +292,9 @@ def test_distribution_of_groups_dependent_on_car_possession_correction_factor(se
 
     # Normalize the 'laag' income group distribution (columns 0-15) for each zone.
     laag_dist_zone0 = data[0, 0:15] / data[0, 0:15].sum()
-    hoog_dist_zone0 = data[0, 45:60] / data[0, 45:60].sum()
     laag_dist_zone1 = data[1, 0:15] / data[1, 0:15].sum()
+    # Do the same for 'high' income group distribution (column 45-60)
+    hoog_dist_zone0 = data[0, 45:60] / data[0, 45:60].sum()
     hoog_dist_zone1 = data[1, 45:60] / data[1, 45:60].sum()
 
     # The normalized distribution within the income group should be identical
