@@ -1,9 +1,11 @@
 import numpy as np
+import pytest
 
 from ikob.datasource import DataKey
 
 
-def test_get_weight_matrix_auto_with_electric_ratio():
+@pytest.mark.parametrize(("ratio_electric"), ([0, 0.3, 1.0]))
+def test_get_weight_matrix_auto_with_electric_ratio(ratio_electric):
     """Test that get_weight_matrix correctly blends fossil and electric car matrices."""
     from ikob.competition import get_weight_matrix
 
@@ -21,7 +23,6 @@ def test_get_weight_matrix_auto_with_electric_ratio():
     single_weights = MockWeights()
     combined_weights = MockWeights()
 
-    # Test with 30% electric ratio
     result = get_weight_matrix(
         single_weights,
         combined_weights,
@@ -32,11 +33,10 @@ def test_get_weight_matrix_auto_with_electric_ratio():
         part_of_day="Spits",
         income="laag",
         income_group="laag",
-        ratio_electric=0.3,
+        ratio_electric=ratio_electric,
     )
 
-    # Expected: 0.3 * electric + 0.7 * fossil
-    expected = 0.3 * electric_matrix + 0.7 * fossil_matrix
+    expected = ratio_electric * electric_matrix + (1 - ratio_electric) * fossil_matrix
     np.testing.assert_array_equal(result, expected)
 
 
