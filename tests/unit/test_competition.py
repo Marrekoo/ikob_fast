@@ -108,8 +108,12 @@ def test_get_weight_matrix_combined_modality():
     # Combined modality should use combined_weights
     np.testing.assert_array_equal(result, combined_matrix)
 
+# as defined in competition
+modalities = ["Fiets", "Auto", "OV", "Auto_Fiets", "OV_Fiets", "Auto_OV", "Auto_OV_Fiets"]
 
-def test_competition_on_jobs_per_capita_sensitivity(monkeypatch, segs_capture):
+
+@pytest.mark.parametrize("modality", modalities)
+def test_competition_on_jobs_per_capita_sensitivity(modality, monkeypatch, segs_capture):
     import ikob.competition as comp
     from ikob.datasource import DataKey
 
@@ -202,7 +206,7 @@ def test_competition_on_jobs_per_capita_sensitivity(monkeypatch, segs_capture):
         subtopic="arbeidsplaatsen",
         income="laag",
         motive=motive,
-        modality="Auto",
+        modality=modality,
     )
     total = competitions.get(key)
 
