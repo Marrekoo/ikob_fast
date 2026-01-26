@@ -110,12 +110,6 @@ def test_get_weight_matrix_combined_modality():
 
 
 def test_competition_on_jobs_per_capita_sensitivity(monkeypatch, segs_capture):
-    """Intended behavior: with identity reach, competition should scale with jobs per capita.
-
-    This is expected to FAIL if the implementation divides by an income *share* rather than
-    using absolute counts.
-    """
-
     import ikob.competition as comp
     from ikob.datasource import DataKey
 
@@ -157,8 +151,10 @@ def test_competition_on_jobs_per_capita_sensitivity(monkeypatch, segs_capture):
         }
     )
 
-    identity = np.eye(2)
-    monkeypatch.setattr(comp, "get_weight_matrix", lambda *args, **kwargs: identity)
+    # Diagonal weight matrix: each zone only reaches its own jobs.
+    weight = 0.8
+    weight_matrix = np.eye(2) * weight
+    monkeypatch.setattr(comp, "get_weight_matrix", lambda *args, **kwargs: weight_matrix)
     monkeypatch.setattr(comp.DataSource, "write_csv", lambda *args, **kwargs: None)
     monkeypatch.setattr(comp.DataSource, "write_xlsx", lambda *args, **kwargs: None)
 
@@ -176,7 +172,7 @@ def test_competition_on_jobs_per_capita_sensitivity(monkeypatch, segs_capture):
 
     class _Weights:
         def get(self, _key):
-            return identity
+            return weight_matrix
 
     config = {
         "__filename__": "pytest",
@@ -210,6 +206,6 @@ def test_competition_on_jobs_per_capita_sensitivity(monkeypatch, segs_capture):
     )
     total = competitions.get(key)
 
-    # Intended per-capita behavior under identity reach: jobs_low / citizens_low.
-    expected = jobs_income_present[:, 0] / jobs_income_reachable[:, 0]
+    # Intended per-capita behavior under diagonal reach: (jobs_low / citizens_low) * weight
+    expected = (jobs_income_present[:, 0] / jobs_income_reachable[:, 0]) * weight
     np.testing.assert_allclose(total, expected)

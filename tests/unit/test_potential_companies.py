@@ -42,12 +42,13 @@ def potential_companies_setup(monkeypatch, segs_capture):
         }
     )
 
-    # Identity weight matrix: each destination only receives from its own zone.
-    identity = np.eye(2)
+    # Diagonal weight matrix: each zone only reaches its own jobs.
+    weight = 0.8
+    weight_matrix = np.eye(2) * weight
 
     class _Weights:
         def get(self, _key):
-            return identity
+            return weight_matrix
 
     # Capture xlsx writes
     xlsx_writes = []
@@ -85,6 +86,7 @@ def potential_companies_setup(monkeypatch, segs_capture):
         "motive": motive,
         "working_pop_income": working_pop_income,
         "jobs_income": jobs_income,
+        "weight": weight,
     }
 
 
@@ -95,6 +97,8 @@ def test_potential_companies_totals(potential_companies_setup):
     origins = potential_companies_setup["origins"]
     pod = potential_companies_setup["pod"]
     motive = potential_companies_setup["motive"]
+    working_pop_income = potential_companies_setup["working_pop_income"]
+    weight = potential_companies_setup["weight"]
 
     key = DataKey(
         "Totaal",
@@ -106,8 +110,8 @@ def test_potential_companies_totals(potential_companies_setup):
     )
     totals = origins.get(key)
 
-    # Intended behavior (identity reach): each destination receives its own working population.
-    expected_totaal = np.array([100.0, 100.0])
+    # Intended behavior (diagonal reach): each destination receives its own working population.
+    expected_totaal = np.array(working_pop_income[:, 0] * weight)
     np.testing.assert_allclose(totals, expected_totaal)
 
 
@@ -117,6 +121,7 @@ def test_potential_companies_pot_totaal(potential_companies_setup):
     xlsx_writes = potential_companies_setup["xlsx_writes"]
     working_pop_income = potential_companies_setup["working_pop_income"]
     jobs_income = potential_companies_setup["jobs_income"]
+    weight = potential_companies_setup["weight"]
 
     # Test Pot_totaal xlsx write (per modality, showing reachability by income group)
     pot_totaal_writes = [w for w in xlsx_writes if w["key"].id == "Pot_totaal" and w["key"].modality == "Auto"]
@@ -124,7 +129,7 @@ def test_potential_companies_pot_totaal(potential_companies_setup):
 
     pot_totaal_data = pot_totaal_writes[0]["data"]
     # Since each destination only receives from its own zone, the reachability equals working_pop_income values.
-    np.testing.assert_array_equal(pot_totaal_data, working_pop_income)
+    np.testing.assert_array_equal(pot_totaal_data, working_pop_income * weight)
 
     # Test Pot_totaalproduct xlsx write (product of reachability and jobs)
     pot_product_writes = [w for w in xlsx_writes if w["key"].id == "Pot_totaalproduct" and w["key"].modality == "Auto"]
@@ -132,4 +137,4 @@ def test_potential_companies_pot_totaal(potential_companies_setup):
 
     pot_product_data = pot_product_writes[0]["data"]
     # Product should be reachability * jobs per zone and income
-    np.testing.assert_array_equal(pot_product_data, working_pop_income * jobs_income)
+    np.testing.assert_array_equal(pot_product_data, working_pop_income * weight * jobs_income)

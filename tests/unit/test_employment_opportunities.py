@@ -46,9 +46,10 @@ def employment_opportunities_setup(monkeypatch, segs_capture):
         }
     )
 
-    # Identity weight matrix: each zone only reaches its own jobs.
-    identity = np.eye(2)
-    monkeypatch.setattr(employment_opportunities, "get_weight_matrix", lambda *args, **kwargs: identity)
+    # Diagonal weight matrix: each zone only reaches its own jobs.
+    weight = 0.8
+    weight_matrix = np.eye(2) * weight
+    monkeypatch.setattr(employment_opportunities, "get_weight_matrix", lambda *args, **kwargs: weight_matrix)
 
     # Capture xlsx writes
     xlsx_writes = []
@@ -61,7 +62,7 @@ def employment_opportunities_setup(monkeypatch, segs_capture):
 
     class _Weights:
         def get(self, _key):
-            return identity
+            return weight_matrix
 
     config = {
         "__filename__": "pytest",
@@ -90,6 +91,7 @@ def employment_opportunities_setup(monkeypatch, segs_capture):
         "motive": motive,
         "working_pop_income": working_pop_income,
         "jobs_income": jobs_income,
+        "weight": weight,
     }
 
 
@@ -97,10 +99,11 @@ def test_employment_opportunities_totals(employment_opportunities_setup):
     """Reachable employment opportunities totals are independent of working population size and distribution over groups."""
     from ikob.datasource import DataKey
 
-    setup = employment_opportunities_setup
-    potencies = setup["potencies"]
-    pod = setup["pod"]
-    motive = setup["motive"]
+    potencies = employment_opportunities_setup["potencies"]
+    pod = employment_opportunities_setup["pod"]
+    motive = employment_opportunities_setup["motive"]
+    jobs_income = employment_opportunities_setup["jobs_income"]
+    weight = employment_opportunities_setup["weight"]
 
     key = DataKey(
         "Totaal",
@@ -112,26 +115,26 @@ def test_employment_opportunities_totals(employment_opportunities_setup):
     )
     totals = potencies.get(key)
 
-    # Intended behavior (identity reach): each zone reaches its own jobs.
-    expected_totaal = np.array([100.0, 100.0])
+    # Intended behavior: each zone reaches its own jobs, multiplied by the weight
+    expected_totaal = jobs_income[:, 0] * weight
     np.testing.assert_allclose(totals, expected_totaal)
 
 
 def test_employment_opportunities_ontpl_totaal(employment_opportunities_setup):
     """Ontpl_totaal xlsx output shows reachability by income group, independent of distribution over groups."""
 
-    setup = employment_opportunities_setup
-    xlsx_writes = setup["xlsx_writes"]
-    working_pop_income = setup["working_pop_income"]
-    jobs_income = setup["jobs_income"]
+    xlsx_writes = employment_opportunities_setup["xlsx_writes"]
+    working_pop_income = employment_opportunities_setup["working_pop_income"]
+    jobs_income = employment_opportunities_setup["jobs_income"]
+    weight = employment_opportunities_setup["weight"]
 
     # Test Ontpl_totaal xlsx write (per modality, showing reachability by income group)
     ontpl_totaal_writes = [w for w in xlsx_writes if w["key"].id == "Ontpl_totaal" and w["key"].modality == "Auto"]
     assert len(ontpl_totaal_writes) == 1, "Expected exactly one Ontpl_totaal write for Auto modality"
 
     ontpl_totaal_data = ontpl_totaal_writes[0]["data"]
-    # Since all zones can only reach their own jobs, the reachability is equal to the jobs_income values.
-    np.testing.assert_array_equal(ontpl_totaal_data, jobs_income)
+    # Since all zones can only reach their own jobs, the reachability is equal to the jobs_income values. Multiplied by the weight
+    np.testing.assert_array_equal(ontpl_totaal_data, jobs_income * weight)
 
     # Test Ontpl_totaalproduct xlsx write (product of reachability and population)
     ontpl_product_writes = [
@@ -141,4 +144,4 @@ def test_employment_opportunities_ontpl_totaal(employment_opportunities_setup):
 
     ontpl_product_data = ontpl_product_writes[0]["data"]
     # Product should be reachability * working_population per zone and income
-    np.testing.assert_array_equal(ontpl_product_data, jobs_income * working_pop_income)
+    np.testing.assert_array_equal(ontpl_product_data, jobs_income * weight * working_pop_income)
