@@ -14,16 +14,16 @@ def employment_opportunities_setup(monkeypatch, segs_capture):
     # Working population size should not matter for total employment opportunities.
     working_pop_income = np.array(
         [
-            [50.0, 50.0, 0.0, 0.0],
-            [100.0, 100.0, 0.0, 0.0],
+            [50.0, 50.0, 0, 100.0],
+            [100.0, 100.0, 0, 200.0],
         ]
     )
 
     # All zones have the same job opportunities for low income.
     jobs_income = np.array(
         [
-            [100.0, 0.0, 0.0, 0.0],
-            [100.0, 0.0, 0.0, 0.0],
+            [100.0, 0.0, 0.0, 40.0],
+            [100.0, 0.0, 0.0, 20.0],
         ]
     )
 
@@ -35,8 +35,9 @@ def employment_opportunities_setup(monkeypatch, segs_capture):
     distribution_per_income[1, 1] = 0.5
 
     distribution = np.zeros((2, 60), dtype=float)
-    distribution[:, 0:15] = distribution_per_income * 0.5
-    distribution[:, 15:30] = distribution_per_income * 0.5
+    distribution[:, 0:15] = distribution_per_income * (1 / 4)
+    distribution[:, 15:30] = distribution_per_income * (1 / 4)
+    distribution[:, 45:60] = distribution_per_income * (1 / 2)
 
     segs_capture(
         {
@@ -94,8 +95,14 @@ def employment_opportunities_setup(monkeypatch, segs_capture):
         "weight": weight,
     }
 
+# As defined in employment_opportunities
+modalities = ["Fiets", "Auto", "OV", "Auto_Fiets", "OV_Fiets", "Auto_OV", "Auto_OV_Fiets"]
 
-def test_employment_opportunities_totals(employment_opportunities_setup):
+@pytest.mark.parametrize("modality", modalities)
+@pytest.mark.parametrize(
+    ("income_group", "income_index"), (("laag", 0), ("middellaag", 1), ("middelhoog", 2), ("hoog", 3))
+)
+def test_employment_opportunities_totals(modality, income_group, income_index, employment_opportunities_setup):
     """Reachable employment opportunities totals are independent of working population size and distribution over groups."""
     from ikob.datasource import DataKey
 
@@ -108,19 +115,20 @@ def test_employment_opportunities_totals(employment_opportunities_setup):
     key = DataKey(
         "Totaal",
         part_of_day=pod,
-        income="laag",
+        income=income_group,
         group="alle groepen",
         motive=motive,
-        modality="Auto",
+        modality=modality,
     )
     totals = potencies.get(key)
 
     # Intended behavior: each zone reaches its own jobs, multiplied by the weight
-    expected_totaal = jobs_income[:, 0] * weight
+    expected_totaal = jobs_income[:, income_index] * weight
     np.testing.assert_allclose(totals, expected_totaal)
 
 
-def test_employment_opportunities_ontpl_totaal(employment_opportunities_setup):
+@pytest.mark.parametrize("modality", modalities)
+def test_employment_opportunities_ontpl_totaal(modality, employment_opportunities_setup):
     """Ontpl_totaal xlsx output shows reachability by income group, independent of distribution over groups."""
 
     xlsx_writes = employment_opportunities_setup["xlsx_writes"]
@@ -129,8 +137,8 @@ def test_employment_opportunities_ontpl_totaal(employment_opportunities_setup):
     weight = employment_opportunities_setup["weight"]
 
     # Test Ontpl_totaal xlsx write (per modality, showing reachability by income group)
-    ontpl_totaal_writes = [w for w in xlsx_writes if w["key"].id == "Ontpl_totaal" and w["key"].modality == "Auto"]
-    assert len(ontpl_totaal_writes) == 1, "Expected exactly one Ontpl_totaal write for Auto modality"
+    ontpl_totaal_writes = [w for w in xlsx_writes if w["key"].id == "Ontpl_totaal" and w["key"].modality == modality]
+    assert len(ontpl_totaal_writes) == 1, f"Expected exactly one Ontpl_totaal write for modality {modality}"
 
     ontpl_totaal_data = ontpl_totaal_writes[0]["data"]
     # Since all zones can only reach their own jobs, the reachability is equal to the jobs_income values. Multiplied by the weight
@@ -138,9 +146,9 @@ def test_employment_opportunities_ontpl_totaal(employment_opportunities_setup):
 
     # Test Ontpl_totaalproduct xlsx write (product of reachability and population)
     ontpl_product_writes = [
-        w for w in xlsx_writes if w["key"].id == "Ontpl_totaalproduct" and w["key"].modality == "Auto"
+        w for w in xlsx_writes if w["key"].id == "Ontpl_totaalproduct" and w["key"].modality == modality
     ]
-    assert len(ontpl_product_writes) == 1, "Expected exactly one Ontpl_totaalproduct write for Auto modality"
+    assert len(ontpl_product_writes) == 1, f"Expected exactly one Ontpl_totaalproduct write for modality {modality}"
 
     ontpl_product_data = ontpl_product_writes[0]["data"]
     # Product should be reachability * working_population per zone and income
