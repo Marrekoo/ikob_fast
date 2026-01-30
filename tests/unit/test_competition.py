@@ -24,8 +24,8 @@ def test_get_weight_matrix_auto_with_electric_ratio(ratio_electric):
     combined_weights = MockWeights()
 
     result = get_weight_matrix(
-        single_weights,
-        combined_weights,
+        single_weights,  # type: ignore
+        combined_weights,  # type: ignore
         group="WelAuto_vkAuto_laag",
         modality="Auto",
         motive="werk",
@@ -59,8 +59,8 @@ def test_get_weight_matrix_ov_modality():
     combined_weights = MockCombinedWeights()
 
     result = get_weight_matrix(
-        single_weights,
-        combined_weights,
+        single_weights,  # type: ignore
+        combined_weights,  # type: ignore
         group="GeenAuto_vkOV_laag",
         modality="OV",
         motive="werk",
@@ -94,8 +94,8 @@ def test_get_weight_matrix_combined_modality():
 
     # Test with combined modality like AutoOV (car + public transport)
     result = get_weight_matrix(
-        single_weights,
-        combined_weights,
+        single_weights,  # type: ignore
+        combined_weights,  # type: ignore
         group="WelAuto_vkOV_laag",
         modality="AutoOV",
         motive="werk",
@@ -206,7 +206,7 @@ def test_competition_on_jobs_per_capita_sensitivity(modality, income_group, inco
     }
 
     # Act
-    competitions = comp.competition_on_jobs(config, _Weights(), _Weights(), _Origins())
+    competitions = comp.competition_on_jobs(config, _Weights(), _Weights(), _Origins())  # type: ignore
 
     # Assert
 
@@ -223,7 +223,7 @@ def test_competition_on_jobs_per_capita_sensitivity(modality, income_group, inco
     # Intended per-capita behavior under diagonal reach: (jobs_low / citizens_low) * weight
     expected = np.where(
         jobs_income_reachable[:, income_index] > 0,
-        (jobs_income_present[:, income_index] / jobs_income_reachable[:, income_index]) * weight,
+        weight * (jobs_income_present[:, income_index] / jobs_income_reachable[:, income_index]),
         0.0,
     )
     np.testing.assert_allclose(total, expected)

@@ -82,7 +82,7 @@ def potential_companies_setup(monkeypatch, segs_capture):
         "geavanceerd": {"welke_groepen": ["alle groepen"]},
     }
 
-    origins = pc.potential_companies(config, _Weights(), _Weights())
+    origins = pc.potential_companies(config, _Weights(), _Weights())  # type: ignore
 
     return {
         "origins": origins,

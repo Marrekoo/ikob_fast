@@ -83,7 +83,7 @@ def employment_opportunities_setup(monkeypatch, segs_capture):
         "geavanceerd": {"welke_groepen": ["alle groepen"]},
     }
 
-    potencies = employment_opportunities.employment_opportunities(config, _Weights(), _Weights())
+    potencies = employment_opportunities.employment_opportunities(config, _Weights(), _Weights())  # type: ignore
 
     return {
         "potencies": potencies,

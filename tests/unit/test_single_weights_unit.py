@@ -65,7 +65,7 @@ def test_calculate_single_weights_writes_expected_keys():
     }
 
     # Act
-    weights = sw.calculate_single_weights(config, _FakeGTT())
+    weights = sw.calculate_single_weights(config, _FakeGTT())  # type: ignore
 
     # Assert
     # A set of representative keys that must be produced.

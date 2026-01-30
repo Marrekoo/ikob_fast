@@ -86,7 +86,7 @@ def test_combined_modalities_use_elementwise_max(modality_key, modalities, prefe
     }
 
     # Act
-    combined = cw.calculate_combined_weights(config, _FakeSingleWeights())
+    combined = cw.calculate_combined_weights(config, _FakeSingleWeights())  # type: ignore
 
     # Assert
     key_params = {
