@@ -113,7 +113,10 @@ modalities = ["Fiets", "Auto", "OV", "Auto_Fiets", "OV_Fiets", "Auto_OV", "Auto_
 
 
 @pytest.mark.parametrize("modality", modalities)
-def test_competition_on_jobs_per_capita_sensitivity(modality, monkeypatch, segs_capture):
+@pytest.mark.parametrize(
+    ("income_group", "income_index"), (("laag", 0), ("middellaag", 1), ("middelhoog", 2), ("hoog", 3))
+)
+def test_competition_on_jobs_per_capita_sensitivity(modality, income_group, income_index, monkeypatch, segs_capture):
     import ikob.competition as comp
     from ikob.datasource import DataKey
 
@@ -124,28 +127,34 @@ def test_competition_on_jobs_per_capita_sensitivity(modality, monkeypatch, segs_
 
     citizens_income = np.array(
         [
-            [50.0, 50.0, 0.0, 0.0],
-            [100.0, 100.0, 0.0, 0.0],
+            [100.0, 0.0, 0.0, 40.0],
+            [100.0, 0.0, 0.0, 20.0],
         ]
     )
     jobs_income_reachable = np.array(
         [
-            [50.0, 0.0, 0.0, 0.0],
-            [25.0, 0.0, 0.0, 0.0],
+            [50.0, 500.0, 0.0, 25.0],
+            [25.0, 3.1415, 0.0, 50.0],
         ]
     )
     jobs_income_present = np.array(
         [
-            [100.0, 0.0, 0.0, 0.0],
-            [100.0, 0.0, 0.0, 0.0],
+            [50.0, 50.0, 0, 100.0],
+            [100.0, 100.0, 0, 200.0],
         ]
     )
 
-    # Distribution matrix: 2 zones × 60; only one active group column.
+    # Distribution matrix for target group: 2 zones × 60 columns (15 per income class).
+    # The distribution over the groups should be inline with the actual working population.
+    distribution_per_income = np.zeros((2, 15), dtype=float)
+    distribution_per_income[0, 0] = 1.0
+    distribution_per_income[1, 0] = 0.5
+    distribution_per_income[1, 1] = 0.5
+
     distribution = np.zeros((2, 60), dtype=float)
-    distribution[0, 0] = 1.0
-    distribution[1, 0] = 0.75
-    distribution[1, 1] = 0.25
+    distribution[:, 0:15] = distribution_per_income * (1 / 4)
+    distribution[:, 15:30] = distribution_per_income * (1 / 4)
+    distribution[:, 45:60] = distribution_per_income * (1 / 2)
 
     segs_capture(
         {
@@ -156,7 +165,7 @@ def test_competition_on_jobs_per_capita_sensitivity(modality, monkeypatch, segs_
     )
 
     # Diagonal weight matrix: each zone only reaches its own jobs.
-    weight = 0.8
+    weight = 1.0
     weight_matrix = np.eye(2) * weight
     monkeypatch.setattr(comp, "get_weight_matrix", lambda *args, **kwargs: weight_matrix)
     monkeypatch.setattr(comp.DataSource, "write_csv", lambda *args, **kwargs: None)
@@ -204,12 +213,16 @@ def test_competition_on_jobs_per_capita_sensitivity(modality, monkeypatch, segs_
         id="Totaal",
         part_of_day=pod,
         subtopic="arbeidsplaatsen",
-        income="laag",
+        income=income_group,
         motive=motive,
         modality=modality,
     )
     total = competitions.get(key)
 
     # Intended per-capita behavior under diagonal reach: (jobs_low / citizens_low) * weight
-    expected = (jobs_income_present[:, 0] / jobs_income_reachable[:, 0]) * weight
+    expected = np.where(
+        jobs_income_reachable[:, income_index] > 0,
+        (jobs_income_present[:, income_index] / jobs_income_reachable[:, income_index]) * weight,
+        0.0,
+    )
     np.testing.assert_allclose(total, expected)
