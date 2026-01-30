@@ -95,8 +95,10 @@ def employment_opportunities_setup(monkeypatch, segs_capture):
         "weight": weight,
     }
 
+
 # As defined in employment_opportunities
 modalities = ["Fiets", "Auto", "OV", "Auto_Fiets", "OV_Fiets", "Auto_OV", "Auto_OV_Fiets"]
+
 
 @pytest.mark.parametrize("modality", modalities)
 @pytest.mark.parametrize(

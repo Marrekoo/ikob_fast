@@ -108,6 +108,7 @@ def test_get_weight_matrix_combined_modality():
     # Combined modality should use combined_weights
     np.testing.assert_array_equal(result, combined_matrix)
 
+
 # as defined in competition
 modalities = ["Fiets", "Auto", "OV", "Auto_Fiets", "OV_Fiets", "Auto_OV", "Auto_OV_Fiets"]
 
