@@ -2,8 +2,14 @@ import numpy as np
 import pytest
 
 
-@pytest.fixture
-def potential_companies_setup(monkeypatch, segs_capture):
+@pytest.fixture(
+    params=[
+        np.array([[0.8, 0.15, 0.05], [0.2, 0.7, 0.1], [0.1, 0.2, 0.5]]),
+        np.eye(3) * 0.8,
+    ],
+    ids=["complicated_matrix", "diagonal_matrix"],
+)
+def potential_companies_setup(request, monkeypatch, segs_capture):
     """Common setup for potential companies tests."""
     import ikob.potential_companies as pc
 
@@ -52,13 +58,9 @@ def potential_companies_setup(monkeypatch, segs_capture):
         }
     )
 
-    # Diagonal weight matrix: each zone only reaches its own jobs.
-    weight = 0.8
-    weight_matrix = np.eye(3) * weight
-
     class _Weights:
         def get(self, _key):
-            return weight_matrix
+            return request.param
 
     # Capture xlsx writes
     xlsx_writes = []
@@ -96,7 +98,7 @@ def potential_companies_setup(monkeypatch, segs_capture):
         "motive": motive,
         "working_pop_income": working_pop_income,
         "jobs_income": jobs_income,
-        "weight": weight,
+        "weight_matrix": request.param,
     }
 
 
@@ -116,7 +118,7 @@ def test_potential_companies_totals(modality, income_group, income_index, potent
     pod = potential_companies_setup["pod"]
     motive = potential_companies_setup["motive"]
     working_pop_income = potential_companies_setup["working_pop_income"]
-    weight = potential_companies_setup["weight"]
+    weight_matrix = potential_companies_setup["weight_matrix"]
 
     key = DataKey(
         "Totaal",
@@ -127,9 +129,7 @@ def test_potential_companies_totals(modality, income_group, income_index, potent
         modality=modality,
     )
     totals = origins.get(key)
-
-    # Intended behavior (diagonal reach): each destination receives its own working population.
-    expected_totaal = np.array(working_pop_income[:, income_index] * weight)
+    expected_totaal = np.array(weight_matrix.T @ working_pop_income[:, income_index].T)
     np.testing.assert_allclose(totals, expected_totaal)
 
 
@@ -140,15 +140,18 @@ def test_potential_companies_pot_totaal(modality, potential_companies_setup):
     xlsx_writes = potential_companies_setup["xlsx_writes"]
     working_pop_income = potential_companies_setup["working_pop_income"]
     jobs_income = potential_companies_setup["jobs_income"]
-    weight = potential_companies_setup["weight"]
+    weight_matrix = potential_companies_setup["weight_matrix"]
 
     # Test Pot_totaal xlsx write (per modality, showing reachability by income group)
     pot_totaal_writes = [w for w in xlsx_writes if w["key"].id == "Pot_totaal" and w["key"].modality == modality]
     assert len(pot_totaal_writes) == 1, f"Expected exactly one Pot_totaal write for modality {modality}"
 
     pot_totaal_data = pot_totaal_writes[0]["data"]
-    # Since each destination only receives from its own zone, the reachability equals working_pop_income values.
-    np.testing.assert_array_equal(pot_totaal_data, working_pop_income * weight)
+    pot_totaal_expected = np.array(
+        [weight_matrix.T @ working_pop_income[:, i].T for i in range(working_pop_income.shape[1])]
+    ).T
+    # Output files get rounded to integers for presentation
+    np.testing.assert_array_equal(pot_totaal_data, np.round(pot_totaal_expected))
 
     # Test Pot_totaalproduct xlsx write (product of reachability and jobs)
     pot_product_writes = [
@@ -158,4 +161,5 @@ def test_potential_companies_pot_totaal(modality, potential_companies_setup):
 
     pot_product_data = pot_product_writes[0]["data"]
     # Product should be reachability * jobs per zone and income
-    np.testing.assert_array_equal(pot_product_data, working_pop_income * weight * jobs_income)
+    # Output files get rounded to integers for presentation
+    np.testing.assert_array_equal(pot_product_data, np.round(pot_totaal_expected * jobs_income))

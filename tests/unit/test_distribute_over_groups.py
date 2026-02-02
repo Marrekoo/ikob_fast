@@ -53,7 +53,7 @@ def _expected_block(
     free_pt_percentage: float,
     scenario: str = "2023",
 ) -> np.ndarray:
-    """Compute expected output values for income class 'laag' for a zone.
+    """Compute expected output values for one income class (e.g. 'laag') for one zone.
 
     This mirrors the calculations in `ikob.distribute_over_groups.distribute_over_groups`.
     It's not ideal that the test in part reimplements the same logic as the code under test, but still the tested code is significantly more obtuse.
@@ -110,11 +110,11 @@ def _expected_block(
     no_free_car = with_car - free_car
 
     out: list[float] = []
-    # GratisAuto_laag
+    # GratisAuto_{income_group}
     out.append(free_car * (1 - free_pt_percentage) * income_share_of_population)
-    # GratisAuto_GratisOV_laag
+    # GratisAuto_GratisOV_{income_group}
     out.append(free_car * free_pt_percentage * income_share_of_population)
-    # WelAuto_GratisOV_laag
+    # WelAuto_GratisOV_{income_group}
     out.append(no_free_car * free_pt_percentage * income_share_of_population)
     # WelAuto_vk* columns
     for i_pref in range(len(preferences)):
@@ -185,7 +185,7 @@ def test_distribute_over_groups_computation(zone_index, income_group, income_ind
 
     # Each income block is a partition of that income's population share.
     # The 60 total groups can be split up in 4 sections of 15 groups belonging to each income group.
-    # With these segs, each income class has equal is an equal share of the total population: 0.25.
+    # With these segs, each income class is an equal share of the total population: 0.25.
     for income_group_i in range(4):
         start = income_group_i * 15
         end = start + 15
@@ -195,13 +195,13 @@ def test_distribute_over_groups_computation(zone_index, income_group, income_ind
     # using the same calculations as the implementation.
     income_slice = slice(income_index * 15, (income_index + 1) * 15)
     assert header[income_slice] == _expected_header(income_group)
-    expected_laag_zone0 = _expected_block(
+    expected = _expected_block(
         zone_index=zone_index,
         income_index=income_index,
         segs=segs,
         free_pt_percentage=config["verdeling"]["GratisOVpercentage"],
     )
-    np.testing.assert_allclose(data[zone_index, income_slice], expected_laag_zone0)
+    np.testing.assert_allclose(data[zone_index, income_slice], expected)
 
 
 def test_distribution_of_income_group_is_independent_of_population_distribution(segs_capture):

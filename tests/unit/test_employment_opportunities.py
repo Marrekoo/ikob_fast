@@ -2,8 +2,14 @@ import numpy as np
 import pytest
 
 
-@pytest.fixture
-def employment_opportunities_setup(monkeypatch, segs_capture):
+@pytest.fixture(
+    params=[
+        np.array([[0.8, 0.15, 0.05], [0.2, 0.7, 0.1], [0.1, 0.2, 0.5]]),
+        np.eye(3) * 0.8,
+    ],
+    ids=["complicated_matrix", "diagonal_matrix"],
+)
+def employment_opportunities_setup(request, monkeypatch, segs_capture):
     """Common setup for employment opportunities tests."""
     import ikob.employment_opportunities as employment_opportunities
 
@@ -52,10 +58,8 @@ def employment_opportunities_setup(monkeypatch, segs_capture):
         }
     )
 
-    # Diagonal weight matrix: each zone only reaches its own jobs.
-    weight = 0.8
-    weight_matrix = np.eye(3) * weight
-    monkeypatch.setattr(employment_opportunities, "get_weight_matrix", lambda *args, **kwargs: weight_matrix)
+    # Use the parametrized weight matrix
+    monkeypatch.setattr(employment_opportunities, "get_weight_matrix", lambda *args, **kwargs: request.param)
 
     # Capture xlsx writes
     xlsx_writes = []
@@ -68,7 +72,7 @@ def employment_opportunities_setup(monkeypatch, segs_capture):
 
     class _Weights:
         def get(self, _key):
-            return weight_matrix
+            return request.param
 
     config = {
         "__filename__": "pytest",
@@ -97,7 +101,7 @@ def employment_opportunities_setup(monkeypatch, segs_capture):
         "motive": motive,
         "working_pop_income": working_pop_income,
         "jobs_income": jobs_income,
-        "weight": weight,
+        "weight_matrix": request.param,
     }
 
 
@@ -117,7 +121,7 @@ def test_employment_opportunities_totals(modality, income_group, income_index, e
     pod = employment_opportunities_setup["pod"]
     motive = employment_opportunities_setup["motive"]
     jobs_income = employment_opportunities_setup["jobs_income"]
-    weight = employment_opportunities_setup["weight"]
+    weight_matrix = employment_opportunities_setup["weight_matrix"]
 
     key = DataKey(
         "Totaal",
@@ -130,7 +134,7 @@ def test_employment_opportunities_totals(modality, income_group, income_index, e
     totals = potencies.get(key)
 
     # Intended behavior: each zone reaches its own jobs, multiplied by the weight
-    expected_totaal = jobs_income[:, income_index] * weight
+    expected_totaal = weight_matrix @ jobs_income[:, income_index]
     np.testing.assert_allclose(totals, expected_totaal)
 
 
@@ -141,15 +145,18 @@ def test_employment_opportunities_ontpl_totaal(modality, employment_opportunitie
     xlsx_writes = employment_opportunities_setup["xlsx_writes"]
     working_pop_income = employment_opportunities_setup["working_pop_income"]
     jobs_income = employment_opportunities_setup["jobs_income"]
-    weight = employment_opportunities_setup["weight"]
+    weight_matrix = employment_opportunities_setup["weight_matrix"]
 
     # Test Ontpl_totaal xlsx write (per modality, showing reachability by income group)
     ontpl_totaal_writes = [w for w in xlsx_writes if w["key"].id == "Ontpl_totaal" and w["key"].modality == modality]
     assert len(ontpl_totaal_writes) == 1, f"Expected exactly one Ontpl_totaal write for modality {modality}"
 
     ontpl_totaal_data = ontpl_totaal_writes[0]["data"]
-    # Since all zones can only reach their own jobs, the reachability is equal to the jobs_income values. Multiplied by the weight
-    np.testing.assert_array_equal(ontpl_totaal_data, jobs_income * weight)
+    # Ontpl_totaal is the Totaal values for each income group stacked by zone
+    # Each Totaal[income_group] = weight_matrix @ jobs_income[:, income_group]
+    ontpl_totaal_expected = np.array([weight_matrix @ jobs_income[:, i] for i in range(jobs_income.shape[1])]).T
+    # Output files get rounded to integers for presentation
+    np.testing.assert_allclose(ontpl_totaal_data, np.round(ontpl_totaal_expected))
 
     # Test Ontpl_totaalproduct xlsx write (product of reachability and population)
     ontpl_product_writes = [
@@ -158,5 +165,6 @@ def test_employment_opportunities_ontpl_totaal(modality, employment_opportunitie
     assert len(ontpl_product_writes) == 1, f"Expected exactly one Ontpl_totaalproduct write for modality {modality}"
 
     ontpl_product_data = ontpl_product_writes[0]["data"]
-    # Product should be reachability * working_population per zone and income
-    np.testing.assert_array_equal(ontpl_product_data, jobs_income * weight * working_pop_income)
+    # Product should be ontpl_totaal * working_population per zone and income
+    # Output files get rounded to integers for presentation
+    np.testing.assert_allclose(ontpl_product_data, np.round(ontpl_totaal_expected * working_pop_income))
