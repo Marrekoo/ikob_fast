@@ -8,8 +8,9 @@ def test_costs_public_transport_pricecap_and_starting_rate():
     # Prepare
     distance = np.array(
         [
-            [0.0, 10.0],
-            [20.0, 30.0],
+            [0.0, 10.0, 20.0],
+            [20.0, 30.0, 40.0],
+            [5.0, 15.0, 25.0],
         ]
     )
 
@@ -24,8 +25,9 @@ def test_costs_public_transport_pricecap_and_starting_rate():
     # Assert
     expected = np.array(
         [
-            [1.0, 6.0],
-            [11.0, 15.0],
+            [1.0, 6.0, 11.0],
+            [11.0, 15.0, 15.0],
+            [3.5, 8.5, 13.5],
         ]
     )
     np.testing.assert_allclose(costs, expected)
@@ -37,11 +39,11 @@ def setup_generalized_travel_time_input(monkeypatch, gtt):
     regime = "Basis"
     income = "laag"
 
-    car_time = np.array([[10.0, 20.0], [30.0, 40.0]])
-    car_dist = np.array([[1.0, 2.0], [3.0, 4.0]])
-    bike_time = np.array([[100.0, 200.0], [50.0, 180.0]])
-    pt_time = np.array([[1.0, 2.0], [0.4, 5.0]])
-    pt_dist = np.array([[0.0, 10.0], [20.0, 30.0]])
+    car_time = np.array([[10.0, 20.0, 30.0], [40.0, 50.0, 60.0], [70.0, 80.0, 90.0]])
+    car_dist = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]])
+    bike_time = np.array([[100.0, 200.0, 150.0], [50.0, 180.0, 170.0], [160.0, 175.0, 190.0]])
+    pt_time = np.array([[1.0, 2.0, 3.0], [0.4, 5.0, 6.0], [7.0, 8.0, 9.0]])
+    pt_dist = np.array([[0.0, 10.0, 20.0], [20.0, 30.0, 40.0], [5.0, 15.0, 25.0]])
 
     skims_data = {
         ("Auto_Tijd", pod): car_time,
@@ -63,13 +65,14 @@ def setup_generalized_travel_time_input(monkeypatch, gtt):
         [
             [0, 1, 2],
             [1, 3, 4],
+            [2, 4, 6],
         ]
     )
 
     def fake_read_csv_from_config(config, key: str, id: str, type_caster=float):
         # Only used to infer the number of zones when parking costs are disabled.
         if key == "skims" and id == "parkeerzoektijden_bestand":
-            return np.zeros(2)
+            return np.zeros(3)
         raise AssertionError(f"Unexpected read_csv_from_config call: key={key!r}, id={id!r}")
 
     monkeypatch.setattr(gtt, "SkimsSource", fake_skims_source)
@@ -128,6 +131,7 @@ def test_generalized_travel_time_fiets(monkeypatch):
 
     fiets_key = DataKey(id="Fiets", part_of_day=pod, regime=regime, motive=motive)
     fiets = datasource.get(fiets_key)
+    # 9999 is used as a max in the source code.
     expected_fiets = np.where(bike_time < 180, bike_time, 9999)
     np.testing.assert_allclose(fiets, expected_fiets)
 
@@ -191,19 +195,7 @@ def test_generalized_travel_time_auto_fossiel(monkeypatch):
     auto_key = DataKey(id="Auto_fossiel", part_of_day=pod, income=income, regime=regime, motive=motive)
     auto = datasource.get(auto_key)
     # total_time = car_time + parking_arrival(origin) + parking_departure(dest)
-    total_time = np.array(
-        [
-            [
-                car_time[0][0] + parking_times[0][1] + parking_times[0][2],
-                car_time[0][1] + parking_times[0][1] + parking_times[1][2],
-            ],
-            [
-                car_time[1][0] + parking_times[1][1] + parking_times[0][2],
-                car_time[1][1] + parking_times[1][1] + parking_times[1][2],
-            ],
-        ],
-        dtype=float,
-    )
+    total_time = car_time + parking_times[:, [1]] + parking_times[[0, 1, 2], [2]]
     expected_auto = total_time + config["TVOM"][motive][income] * car_dist * (
         config["skims"]["Kosten auto fossiele brandstof"]["variabele kosten"] / 100
         + config["skims"]["Kosten auto fossiele brandstof"]["kmheffing"] / 100
@@ -266,8 +258,8 @@ def test_generalized_travel_time_includes_additional_and_parking_costs(monkeypat
         setup_generalized_travel_time_input(monkeypatch, gtt)
     )
 
-    parking_costs = np.array([100.0, 300.0])
-    additional_costs = np.array([[0.0, 50.0], [100.0, 0.0]])
+    parking_costs = np.array([100.0, 300.0, 500.0])
+    additional_costs = np.array([[0.0, 50.0, 25.0], [100.0, 0.0, 75.0], [60.0, 80.0, 90.0]])
 
     def fake_read_csv_from_config(config, key: str, id: str, type_caster=float):
         if key == "skims" and id == "parkeerzoektijden_bestand":
@@ -304,3 +296,4 @@ def test_generalized_travel_time_includes_additional_and_parking_costs(monkeypat
             + parking_costs[1] / 100
         )
     )
+    assert auto.shape == (3, 3)

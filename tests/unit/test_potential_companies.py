@@ -16,6 +16,7 @@ def potential_companies_setup(monkeypatch, segs_capture):
         [
             [100.0, 0.0, 0.0, 40.0],
             [100.0, 0.0, 0.0, 20.0],
+            [80.0, 0.0, 0.0, 30.0],
         ]
     )
 
@@ -24,17 +25,21 @@ def potential_companies_setup(monkeypatch, segs_capture):
         [
             [50.0, 50.0, 0, 100.0],
             [100.0, 100.0, 0, 200.0],
+            [75.0, 75.0, 0, 150.0],
         ]
     )
 
-    # Distribution matrix for target group: 2 zones × 60 columns.
+    # Distribution matrix for target group: 3 zones × 60 columns.
     # Total results should not be dependent on this distribution.
-    distribution_per_income = np.zeros((2, 15), dtype=float)
+    distribution_per_income = np.zeros((3, 15), dtype=float)
     distribution_per_income[0, 0] = 1.0
     distribution_per_income[1, 0] = 0.5
     distribution_per_income[1, 1] = 0.5
+    distribution_per_income[2, 0] = 0.3
+    distribution_per_income[2, 1] = 0.4
+    distribution_per_income[2, 2] = 0.3
 
-    distribution = np.zeros((2, 60), dtype=float)
+    distribution = np.zeros((3, 60), dtype=float)
     distribution[:, 0:15] = distribution_per_income * (1 / 4)
     distribution[:, 15:30] = distribution_per_income * (1 / 4)
     distribution[:, 45:60] = distribution_per_income * (1 / 2)
@@ -49,7 +54,7 @@ def potential_companies_setup(monkeypatch, segs_capture):
 
     # Diagonal weight matrix: each zone only reaches its own jobs.
     weight = 0.8
-    weight_matrix = np.eye(2) * weight
+    weight_matrix = np.eye(3) * weight
 
     class _Weights:
         def get(self, _key):

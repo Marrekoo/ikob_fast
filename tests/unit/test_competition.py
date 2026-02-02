@@ -166,7 +166,7 @@ def test_competition_on_jobs_per_capita_sensitivity(modality, income_group, inco
     )
 
     # Diagonal weight matrix: each zone only reaches its own jobs.
-    weight = 1.0
+    weight = 0.8
     weight_matrix = np.eye(2) * weight
     monkeypatch.setattr(comp, "get_weight_matrix", lambda *args, **kwargs: weight_matrix)
     monkeypatch.setattr(comp.DataSource, "write_csv", lambda *args, **kwargs: None)

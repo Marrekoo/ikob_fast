@@ -52,10 +52,10 @@ def test_combined_modalities_use_elementwise_max(modality_key, modalities, prefe
     motive = "werk"
     regime = "Basis"
 
-    bike = np.array([[1.0, 0.0], [0.0, 0.0]])
-    pt = np.array([[0.0, 1.0], [0.0, 0.0]])
-    car_fossil = np.array([[0.0, 0.0], [1.0, 0.0]])
-    car_electric = np.array([[0.0, 0.0], [0.0, 1.0]])
+    bike = np.array([[1.0, 0.0, 0.5], [0.0, 0.0, 0.2], [0.3, 0.1, 0.4]])
+    pt = np.array([[0.0, 1.0, 0.3], [0.0, 0.0, 0.5], [0.2, 0.6, 0.1]])
+    car_fossil = np.array([[0.0, 0.0, 0.2], [1.0, 0.0, 0.4], [0.1, 0.3, 0.7]])
+    car_electric = np.array([[0.0, 0.0, 0.1], [0.0, 1.0, 0.6], [0.4, 0.2, 0.5]])
     car = car_fossil if fuel_kind == "fossiel" else car_electric
 
     class _FakeSingleWeights:
