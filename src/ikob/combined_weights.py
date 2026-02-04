@@ -77,6 +77,7 @@ def calculate_combined_weights(config, single_weights: DataSource) -> DataSource
                                 f"{modality_bike}_vk",
                                 part_of_day=part_of_day,
                                 preference=preference_bike,
+                                income=income,
                                 regime=regimes,
                                 motive=motive,
                             )
@@ -114,6 +115,7 @@ def calculate_combined_weights(config, single_weights: DataSource) -> DataSource
                                 f"{modality_bike}_vk",
                                 part_of_day=part_of_day,
                                 preference=preference_bike,
+                                income=income,
                                 regime=regimes,
                                 motive=motive,
                             )
@@ -244,6 +246,7 @@ def calculate_combined_weights(config, single_weights: DataSource) -> DataSource
                                     f"{modality_bike}_vk",
                                     part_of_day=part_of_day,
                                     preference=preference_bike,
+                                    income=income,
                                     regime=regimes,
                                     motive=motive,
                                 )

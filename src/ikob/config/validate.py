@@ -1,5 +1,9 @@
 ### Validate the template
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 def _validateDefaultType(valtype, defvalue):
     defvaluetype = type(defvalue)

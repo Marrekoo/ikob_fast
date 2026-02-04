@@ -182,6 +182,12 @@ def default_skims_tab():
                 unit="Euro/Minuut",
             ),
         },
+        "bike_cost_ct_km": config_item(
+            "Fiets kosten of -vergoeding (negatief bedrag is vergoeding)",
+            DataType.NUMBER,
+            default=0.0,
+            unit="Eurocent/km",
+        ),
     }
 
 

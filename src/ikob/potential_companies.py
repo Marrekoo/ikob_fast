@@ -163,6 +163,7 @@ def potential_companies(config, single_weights: DataSource, combined_weights: Da
                                         f"{modality}_vk",
                                         part_of_day=part_of_day,
                                         preference=tmp_preference,
+                                        income=income,
                                         regime=regimes,
                                         motive=motive,
                                     )
