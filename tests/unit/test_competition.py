@@ -32,7 +32,6 @@ def test_get_weight_matrix_auto_with_electric_ratio(ratio_electric):
         regime="Basis",
         part_of_day="Spits",
         income="laag",
-        income_group="laag",
         ratio_electric=ratio_electric,
     )
 
@@ -67,7 +66,6 @@ def test_get_weight_matrix_ov_modality():
         regime="Basis",
         part_of_day="Spits",
         income="laag",
-        income_group="laag",
         ratio_electric=0.0,
     )
     # OV modality should use single_weights
@@ -102,7 +100,6 @@ def test_get_weight_matrix_combined_modality():
         regime="Basis",
         part_of_day="Spits",
         income="laag",
-        income_group="laag",
         ratio_electric=0.0,
     )
     # Combined modality should use combined_weights
