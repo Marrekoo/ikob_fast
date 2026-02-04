@@ -368,6 +368,7 @@ def try_fix_incompatible_configuration(config):
 
     Some configuration changes can be automatically resolved to
     maintain backward compatibility.
+    Adds default values to the config if they are missing.
     """
     fixers = [
         transfer_to_advanced_tab,
@@ -375,12 +376,25 @@ def try_fix_incompatible_configuration(config):
         fiets_checklist_to_checkbox,
     ]
 
+    default = default_config()
     for fixer in fixers:
         config = fixer(config)
-        if validate_config(config):
-            return config
-
+        new_config = merge_configs(default, config)
+        if validate_config(new_config):
+            logger.info("Auto fixed config")
+            return new_config
+    logger.warning("Could not auto fix configuration. Using provided config as-is.")
     return config
+
+
+def merge_configs(default, custom):
+    """Merge custom configuration with default configuration."""
+    if isinstance(default, dict) and isinstance(custom, dict):
+        result = default.copy()
+        for key, value in custom.items():
+            result[key] = merge_configs(default.get(key, {}), value)
+        return result
+    return custom if custom is not None else default
 
 
 def transfer_to_advanced_tab(config):
