@@ -3,7 +3,7 @@ import logging
 import os
 import pathlib
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Type
 
 from numpy.typing import NDArray
 
@@ -124,7 +124,7 @@ class SegsSource:
         os.makedirs(path, exist_ok=True)
         return path / filename
 
-    def read(self, id: str, jaar="", type_caster=int, scenario=""):
+    def read(self, id: str, jaar="", type_caster: Type = int, scenario=""):
         # TODO: This is a temporary fix. The 'Verdeling_over_groepen*'
         # files are written to disk as SEGS files. These were originally
         # written back into the _input_ directory and read out in later

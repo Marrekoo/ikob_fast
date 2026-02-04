@@ -42,7 +42,7 @@ def test_assert_failed_parkeerzoektijden_conversion():
     project_file = project_dir.joinpath(f"{case}.json")
 
     # Overwrite SEGS directory to trigger failure in converting
-    # parkeerzoektijden as stedelijkheidsgraag is not present.
+    # parkeerzoektijden as stedelijkheidsgraad is not present.
     config = get_config_from_args(project_file)
     config["skims"]["parkeerzoektijden_bestand"] = "unset"
     config["project"]["paden"]["segs_directory"] = "unset"

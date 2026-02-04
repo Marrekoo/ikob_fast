@@ -1,12 +1,8 @@
-import logging
 import pathlib
 
-from test_end_to_end import compare_directories, remove_directory
-
-from ikob.distribute_over_groups import distribute_groups_over_zones
+from ikob.distribute_over_groups import distribute_population_over_groups
 from ikob.ikobconfig import get_config_from_args
-
-logger = logging.getLogger(__name__)
+from tests.e2e.test_end_to_end import compare_directories, remove_directory
 
 
 def test_group_distribution():
@@ -21,7 +17,7 @@ def test_group_distribution():
     project_dir = pathlib.Path(f"tests/{case}/")
     config = get_config_from_args(project_dir / f"{case}.json")
 
-    distribute_groups_over_zones(config)
+    distribute_population_over_groups(config)
 
     msg = "Result and reference directories are not equal."
     result_dir = project_dir / case

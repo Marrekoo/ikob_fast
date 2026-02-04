@@ -9,7 +9,7 @@ from ikob.combined_weights import calculate_combined_weights
 from ikob.competition import competition_on_citizens, competition_on_jobs
 from ikob.config import widgets
 from ikob.datasource import DataSource, DataType
-from ikob.distribute_over_groups import distribute_groups_over_zones
+from ikob.distribute_over_groups import distribute_population_over_groups
 from ikob.employment_opportunities import employment_opportunities
 from ikob.generalized_travel_time import generalized_travel_time
 from ikob.ikobconfig import get_config_from_args, load_config
@@ -47,7 +47,7 @@ def run_scripts(project_file, skip_steps: list[bool] | None = None, write_weight
 
     if not skip_steps[1]:
         # TODO: Pass temporary SEGS output as arguments too.
-        distribute_groups_over_zones(config)
+        distribute_population_over_groups(config)
 
     if not skip_steps[2]:
         single_weights = calculate_single_weights(config, travel_time)

@@ -20,6 +20,7 @@ def file_to_frame(path: pathlib.Path) -> pd.DataFrame:
             return pd.read_csv(path, dtype=float, header=None)
         except ValueError:
             return pd.read_csv(path, dtype=float)
+    raise ValueError(f"Calling file to frame with unknown extension {path.suffix}. Must be either .csv or .xlsx.")
 
 
 def is_equal_excel_csv(result: pathlib.Path, reference: pathlib.Path) -> bool:

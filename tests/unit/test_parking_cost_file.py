@@ -1,8 +1,7 @@
 import pathlib
 
-from test_end_to_end import compare_directories, remove_directory
-
 from ikob.ikobrunner import run_scripts
+from tests.e2e.test_end_to_end import compare_directories, remove_directory
 
 
 def test_config_with_parking_cost_file():
