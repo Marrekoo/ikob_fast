@@ -8,7 +8,7 @@ This data is used to create accessibility profiles for several groups within soc
 Potential accessibility is calculated in analogy with [Hansen (1958)](https://www.tandfonline.com/doi/abs/10.1080/01944365908978307 "Subscription needed"). It uses distance decay curves for each mode, based on time and cost (perception) by each group in society.
 So, the further away an amenity (like a job location) is, the less it will count as a full option. The calculated potential accessibility, therefore, is a weighted amount.
 
-Some commonly used abbreviations / jargon:
+Some commonly used abbreviations / jargon / odd terms:
 - TVOM: Time value of money, how much money a unit of time is worth.  
   Used to combine both travel time and travel costs into a single metric.
 - SEGS: Sociaal-economische gegevens (Social-Economic data).  
@@ -16,6 +16,9 @@ Some commonly used abbreviations / jargon:
 - skims: Data to determine an impedance ('friction') matrix from zone to zone.  
   For example: A matrix of distances via car from zone to zone, costs per kilometer of traveling by car, etc.
 - GTR: Generalized travel time
+- ICE: Internal combustion engine. Also referred to using fuel_kind 'fossiel'. 
+- vk: (dutch) voorkeur / (english) preference
+- groups: See [Groups](./README.md#groups)
 
 ## Installation and usage
 
@@ -167,7 +170,40 @@ There are some reference tests:
 - tests/unit/test_group_distribution.py
 
 These compare current output against stored reference output.
-These detect when output has changed but don't verify expected behavior.
+These detect when output has changed but don't verify expected behavior. 
 
 To generate new reference data for these tests it's easiest to just run the test without deleting the computed results at the end. In general this boils down to removing the `remove_directory` call. If the test uses a [temporary test directory](https://docs.pytest.org/en/6.2.x/tmpdir.html#the-tmpdir-fixture) or something similar, it's easiest to make that a concrete path and get the results from there. 
 
+
+# Groups 
+
+The code uses the term 'groups' a lot to refer to different slices of the population. Income groups (income classes) are different from groups. 
+
+The code uses the following income classes:
+- low
+- medium-low
+- medium-high
+- high
+
+The groups are there to differentiate differentiate slices of the population with different modalities at their disposal and with different preferences.\
+The code uses the following groups:
+| Group | Description |
+|---|---|
+| GratisAuto | Those with a free car |
+| GratisAuto_GratisOV | Those with a free car and free public transport |
+| WelAuto_GratisOV | Those with a car and free public transport |
+| WelAuto_vkAuto | Those with a car and a preference for car |
+| WelAuto_vkNeutraal | Those with a car and a neutral preference |
+| WelAuto_vkFiets | Those with a car and a preference for cycling |
+| WelAuto_vkOV | Those with a car and a preference for public transport |
+| GeenAuto_GratisOV | Those without a car and free public transport |
+| GeenAuto_vkNeutraal | Those without a car and a neutral preference |
+| GeenAuto_vkFiets | Those without a car and a preference for cycling |
+| GeenAuto_vkOV | Those without a car and a preference for public transport |
+| GeenRijbewijs_GratisOV | Those without a driver’s license and free public transport |
+| GeenRijbewijs_vkNeutraal | Those without a driver’s license and a neutral preference |
+| GeenRijbewijs_vkFiets | Those without a driver’s license and a preference for cycling |
+| GeenRijbewijs_vkOV | Those without a driver’s license and a preference for public transport |
+
+Where each group is additionally suffixed by an income class to split the population up further.\
+In [distribute_over_groups.py](./src/ikob/distribute_over_groups.py) the population of each zone is distributed over these groups according to social-economic data.
