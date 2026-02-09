@@ -233,6 +233,7 @@ class DataSource:
     def _get_base_dir(self, key: DataKey) -> str:
         if self.datatype in [DataType.COMPETITION, DataType.ORIGINS]:
             return "resultaten"
+        # This is fickle. In practice the whole DataType.DESTINATIONS is also sent to the results dir
         if "totaal" in key.id.lower():
             # Totaal, Ontpl_totaal, Ontpl_totaalproduct
             return "resultaten"
