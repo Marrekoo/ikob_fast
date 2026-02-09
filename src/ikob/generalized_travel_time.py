@@ -64,7 +64,7 @@ def generalized_travel_time(config) -> DataSource:
     parking_costs = advanced_config["parkeerkosten"]["gebruiken"]
     pricecap = skims_config["pricecap"]["gebruiken"]
     pricecap_value = skims_config["pricecap"]["getal"]
-    bike_cost_euro_km = skims_config["bike_cost_ct_km"] / 100
+    bike_cost_euro_per_km = skims_config["bike_cost_ct_per_km"] / 100
     parking_times_temporary = read_csv_from_config(config, key="skims", id="parkeerzoektijden_bestand")
 
     if parking_costs:
@@ -132,8 +132,8 @@ def generalized_travel_time(config) -> DataSource:
 
             # Bike generalized travel time:
             for income_level in income_levels:
-                tvom_min_euro = tvom.get(income_level)
-                gtr_skim = bike_time_matrix + tvom_min_euro * bike_distance_matrix * bike_cost_euro_km
+                tvom_min_per_euro = tvom.get(income_level)
+                gtr_skim = bike_time_matrix + tvom_min_per_euro * bike_distance_matrix * bike_cost_euro_per_km
 
                 key = DataKey(id="Fiets", part_of_day=pod, regime=regime, motive=motive, income=income_level)
                 generalized_travel_time.set(key, gtr_skim.copy())

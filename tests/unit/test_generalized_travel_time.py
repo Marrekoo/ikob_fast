@@ -104,7 +104,7 @@ def setup_generalized_travel_time_input(monkeypatch, gtt):
             "tijdkostenga": {"GeenAuto": 0.05, "GeenRijbewijs": 0.1},
             "dagsoort": [pod],
             "parkeerzoektijden_bestand": "unused.csv",
-            "bike_cost_ct_km": -5.0,
+            "bike_cost_ct_per_km": -5.0,
         },
         "TVOM": {
             "werk": {"laag": 0.1, "middellaag": 0.4, "middelhoog": 0.5, "hoog": 0.7},
@@ -148,7 +148,7 @@ def test_generalized_travel_time_fiets(monkeypatch):
     fiets_key = DataKey(id="Fiets", part_of_day=pod, regime=regime, motive=motive, income=income)
     fiets = datasource.get(fiets_key)
     expected_fiets = (
-        bike_time + config["TVOM"][motive][income] * bike_distance * config["skims"]["bike_cost_ct_km"] / 100
+        bike_time + config["TVOM"][motive][income] * bike_distance * config["skims"]["bike_cost_ct_per_km"] / 100
     )
     np.testing.assert_allclose(fiets, expected_fiets)
 
