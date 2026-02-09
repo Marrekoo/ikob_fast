@@ -161,12 +161,13 @@ The remaining folders contain test projects and reference output.
 ## Reference Tests
 
 There are some reference tests:
-- test_end_to_end.py
-- test_chain_generator.py
-- test_parking_cost_file.py
-- test_group_distribution.py
+- tests/e2e/test_end_to_end.py
+- tests/unit/test_chain_generator.py
+- tests/unit/test_parking_cost_file.py
+- tests/unit/test_group_distribution.py
 
 These compare current output against stored reference output.
 These detect when output has changed but don't verify expected behavior.
 
-To generate new reference data for these tests it's easiest to just run the test without deleting the computed results at the end.
+To generate new reference data for these tests it's easiest to just run the test without deleting the computed results at the end. In general this boils down to removing the `remove_directory` call. If the test uses a [temporary test directory](https://docs.pytest.org/en/6.2.x/tmpdir.html#the-tmpdir-fixture) or something similar, it's easiest to make that a concrete path and get the results from there. 
+
