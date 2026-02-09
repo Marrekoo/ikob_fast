@@ -97,8 +97,7 @@ def test_end_to_end(case):
     compare_dirs = [project_dir / case / s for s in suffixes]
 
     # Delete old results if still present
-    for result_dir in compare_dirs:
-        remove_directory(result_dir)
+    remove_directory(project_dir / case)
 
     # End-to-end test should not skip any steps: all scripts should pass.
     run_scripts(project, write_weights=True)
@@ -108,5 +107,4 @@ def test_end_to_end(case):
         assert compare_directories(result_dir, reference_dir)
 
     # Clean up files if test succeeds
-    for result_dir in compare_dirs:
-        remove_directory(result_dir)
+    remove_directory(project_dir / case)

@@ -2,6 +2,7 @@ import enum
 import logging
 import os
 import pathlib
+import shutil
 from dataclasses import dataclass
 from typing import Optional, Type
 
@@ -194,6 +195,8 @@ class DataKey:
 
 
 class DataSource:
+    OUTPUT_PATH = "OUTPUT.md"
+
     def __init__(self, config, datatype: DataType):
         self.config = config
         self.project_dir = get_project_directory(config)
@@ -267,3 +270,8 @@ class DataSource:
     def write_xlsx(self, data, key: DataKey, header=[]):
         path = self._make_file_path(key).with_suffix(".xlsx")
         return utils.write_xls(data, path, header)
+
+    @staticmethod
+    def write_output_md(config):
+        path = get_project_directory(config) / DataSource.OUTPUT_PATH
+        shutil.copy(DataSource.OUTPUT_PATH, path)

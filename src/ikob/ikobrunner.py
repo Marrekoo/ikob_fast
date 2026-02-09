@@ -92,6 +92,8 @@ def run_scripts(project_file, skip_steps: list[bool] | None = None, write_weight
     for container in sources_to_save:
         container.store()
 
+    DataSource.write_output_md(config)
+
 
 # User interface
 
