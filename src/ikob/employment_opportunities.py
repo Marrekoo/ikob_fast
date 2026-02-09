@@ -58,7 +58,6 @@ def employment_opportunities(config, single_weights: DataSource, combined_weight
 
     modalities = ["Fiets", "Auto", "OV", "Auto_Fiets", "OV_Fiets", "Auto_OV", "Auto_OV_Fiets"]
     headstring = ["Fiets", "Auto", "OV", "Auto_Fiets", "OV_Fiets", "Auto_OV", "Auto_OV_Fiets"]
-    headstringExcel = ["Zone", "Fiets", "Auto", "OV", "Auto_Fiets", "OV_Fiets", "Auto_OV", "Auto_OV_Fiets"]
 
     segs_source = SegsSource(config)
 
@@ -183,9 +182,8 @@ def employment_opportunities(config, single_weights: DataSource, combined_weight
                         motive=motive,
                     )
                     potencies.write_csv(general_possibility_totals_transposed, key, header=headstring)
-                    potencies.write_xlsx(general_possibility_totals_transposed, key, header=headstringExcel)
 
-                header = ["Zone", "laag", "middellaag", "middelhoog", "hoog"]
+                header = ["laag", "middellaag", "middelhoog", "hoog"]
                 for modality in modalities:
                     general_matrix_product = []
                     general_matrix = []
@@ -231,7 +229,7 @@ def employment_opportunities(config, single_weights: DataSource, combined_weight
                         motive=motive,
                         modality=modality,
                     )
-                    potencies.write_xlsx(general_possibility_totals_transposed, key, header=header)
+                    potencies.write_csv(general_possibility_totals_transposed, key, header=header)
 
                     general_matrix_product = np.round(general_matrix_product).astype(int)
                     key = DataKey(
@@ -241,6 +239,6 @@ def employment_opportunities(config, single_weights: DataSource, combined_weight
                         motive=motive,
                         modality=modality,
                     )
-                    potencies.write_xlsx(general_matrix_product, key, header=header)
+                    potencies.write_csv(general_matrix_product, key, header=header)
 
     return potencies

@@ -262,14 +262,3 @@ def distribute_population_over_groups(config):
             scenario=scenario,
             header=header,
         )
-        segs_source.write_xlsx(
-            total_survey, "Verdeling_over_groepen", group=population_share, scenario=scenario, header=["Zone", *header]
-        )
-        segs_source.write_xlsx(
-            survey_per_income_class,
-            "Verdeling_over_groepen",
-            group=population_share,
-            modifier="alleen_autobezit",
-            scenario=scenario,
-            header=["Zone", *header],
-        )

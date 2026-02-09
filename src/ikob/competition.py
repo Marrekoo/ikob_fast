@@ -217,7 +217,6 @@ def competition(
     modalities = ["Fiets", "Auto", "OV", "Auto_Fiets", "OV_Fiets", "Auto_OV", "Auto_OV_Fiets"]
     income_groups = ["laag", "middellaag", "middelhoog", "hoog"]
     headstring = ["Fiets", "Auto", "OV", "Auto_Fiets", "OV_Fiets", "Auto_OV", "Auto_OV_Fiets"]
-    headstringExcel = ["Zone", "Fiets", "Auto", "OV", "Auto-Fiets", "OV_Fiets", "Auto_OV", "Auto_OV_Fiets"]
 
     segs_source = SegsSource(config)
 
@@ -332,9 +331,8 @@ def competition(
                             motive=motive,
                         )
                         competitions.write_csv(general_totals_transpose, key, header=headstring)
-                        competitions.write_xlsx(general_totals_transpose, key, header=headstringExcel)
 
-                header = ["Zone", "laag", "middellaag", "middelhoog", "hoog"]
+                header = ["laag", "middellaag", "middelhoog", "hoog"]
                 for modality in modalities:
                     general_matrix_product = []
                     general_matrix = []
@@ -369,7 +367,7 @@ def competition(
                         motive=motive,
                         modality=modality,
                     )
-                    competitions.write_xlsx(general_totals_transpose, key, header=header)
+                    competitions.write_csv(general_totals_transpose, key, header=header)
 
                     key = DataKey(
                         id="Ontpl_concproduct",
@@ -378,6 +376,6 @@ def competition(
                         motive=motive,
                         modality=modality,
                     )
-                    competitions.write_xlsx(general_matrix_product, key, header=header)
+                    competitions.write_csv(general_matrix_product, key, header=header)
 
     return competitions

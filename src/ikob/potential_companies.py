@@ -78,20 +78,6 @@ def potential_companies(config, single_weights: DataSource, combined_weights: Da
         "Auto_OV_Fiets",
         "Auto_OV_EFiets",
     ]
-    headstringExcel = [
-        "Zone",
-        "Fiets",
-        "EFiets",
-        "Auto",
-        "OV",
-        "Auto_Fiets",
-        "OV_Fiets",
-        "Auto_EFiets",
-        "OV_EFiets",
-        "Auto_OV",
-        "Auto_OV_Fiets",
-        "Auto_OV_EFiets",
-    ]
 
     segs_source = SegsSource(config)
 
@@ -286,9 +272,8 @@ def potential_companies(config, single_weights: DataSource, combined_weights: Da
                     origins_total = utils.transpose(general_possibility_totals)
                     origins_total = np.round(origins_total).astype(int)
                     origins.write_csv(origins_total, key, header=headstring)
-                    origins.write_xlsx(origins_total, key, header=headstringExcel)
 
-                header = ["Zone", "laag", "middellaag", "middelhoog", "hoog"]
+                header = ["laag", "middellaag", "middelhoog", "hoog"]
                 for modality in modalities:
                     general_matrix_product = []
                     general_matrix = []
@@ -330,7 +315,7 @@ def potential_companies(config, single_weights: DataSource, combined_weights: Da
                         motive=motive,
                         modality=modality,
                     )
-                    origins.write_xlsx(general_total_transpose, key, header=header)
+                    origins.write_csv(general_total_transpose, key, header=header)
 
                     key = DataKey(
                         id="Pot_totaalproduct",
@@ -339,6 +324,6 @@ def potential_companies(config, single_weights: DataSource, combined_weights: Da
                         motive=motive,
                         modality=modality,
                     )
-                    origins.write_xlsx(general_matrix_product, key, header=header)
+                    origins.write_csv(general_matrix_product, key, header=header)
 
     return origins

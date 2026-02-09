@@ -158,10 +158,6 @@ class SegsSource:
         path = self._segs_output_dir(id, jaar, scenario, group, modifier).with_suffix(".csv")
         return utils.write_csv(data, path, header=header)
 
-    def write_xlsx(self, data, id, header, group="", jaar="", modifier="", scenario=""):
-        path = self._segs_output_dir(id, jaar, scenario, group, modifier).with_suffix(".xlsx")
-        return utils.write_xls(data, path, header)
-
 
 class DataType(enum.Enum):
     DESTINATIONS = "bestemmingen"
@@ -266,10 +262,6 @@ class DataSource:
         assert isinstance(key, DataKey)
         path = self._make_file_path(key).with_suffix(".csv")
         return utils.write_csv(data, path, header=header)
-
-    def write_xlsx(self, data, key: DataKey, header=[]):
-        path = self._make_file_path(key).with_suffix(".xlsx")
-        return utils.write_xls(data, path, header)
 
     @staticmethod
     def write_output_md(config):
