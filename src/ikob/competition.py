@@ -229,6 +229,8 @@ def competition(
 
     income_distributions = compute_income_distributions(citizens_per_class if citizens else places_of_employment)
     subtopic_competition = "inwoners" if citizens else "arbeidsplaatsen"
+    # Matches the suffix in potential_companies.py and employment_opportunities.py
+    competition_filename_suffix = "Pot" if citizens else "Ontpl"
     competitions = DataSource(config, DataType.COMPETITION)
 
     if citizens:
@@ -325,7 +327,7 @@ def competition(
                         general_possibility_totals.append(competitions.get(key))
                         general_totals_transpose = utils.transpose(general_possibility_totals)
                         key = DataKey(
-                            id="Ontpl_conc",
+                            id=f"{competition_filename_suffix}_conc",
                             part_of_day=part_of_day,
                             subtopic=subtopic_competition,
                             income=income_group,
@@ -364,7 +366,7 @@ def competition(
                                 general_matrix_product[i].append(0)
 
                     key = DataKey(
-                        id="Ontpl_conc",
+                        id=f"{competition_filename_suffix}_conc",
                         part_of_day=part_of_day,
                         subtopic=subtopic_competition,
                         motive=motive,
@@ -374,7 +376,7 @@ def competition(
                     competitions.write_csv(general_totals_transpose, key, header=header)
 
                     key = DataKey(
-                        id="Ontpl_concproduct",
+                        id=f"{competition_filename_suffix}_concproduct",
                         part_of_day=part_of_day,
                         subtopic=subtopic_competition,
                         motive=motive,

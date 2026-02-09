@@ -255,16 +255,18 @@ While these results may seem secondary to how well the travel population can rea
 
 The interpretation of the results differ, but the structure of this directory is the same as the ['bestemmingen' (destinations) directory](#resultatenmotivegroupsbestemmingentime-of-day), with the exception that where some destination results are prefixed with 'Ontpl_' (ontplooiing/development), the corresponding 'herkomsten' (origins) results are prefixed with 'Pot_' (potentieel/potential).
 
-### resultaten/motive/concurrentie/arbeidsplaatsen/time-of-day
+### resultaten/motive/groups/concurrentie/arbeidsplaatsen/time-of-day
 
-Same structure as resultaten/motive/groups/bestemmingen/time-of-day. Ontpl_totaal_ and Ontpl_totaalproduct_ are called Ontpl_conc_ and Ontpl_concproduct_.
+Same structure as [resultaten/motive/groups/bestemmingen/time-of-day](#resultatenmotiveconcurrentiearbeidsplaatsentime-of-day). Ontpl_totaal_ and Ontpl_totaalproduct_ are called Ontpl_conc_ and Ontpl_concproduct_.
 Contains results on competition for destinations by the traveling population. A low value indicates that a zone is at a disadvantage compared to other zones in reaching destinations. 
+Uses the same prefix as [resultaten/motive/groups/bestemmingen/time-of-day](#resultatenmotiveconcurrentiearbeidsplaatsentime-of-day) to indicate that this competition is on destination and effects the 'ontplooiing' (development) of citizens
 
 
-### resultaten/motive/concurrentie/inwoners/time-of-day
+### resultaten/motive/groups/concurrentie/inwoners/time-of-day
 
-Same structure as resultaten/motive/groups/bestemmingen/time-of-day. Ontpl_totaal_ and Ontpl_totaalproduct_ are called Ontpl_conc_ and Ontpl_concproduct_.
+Same structure as [resultaten/motive/groups/herkomsten/time-of-day](#resultatenmotivegroupsherkomstentime-of-day). Pot_totaal_ and Pot_totaalproduct_ are called Pot_conc_ and Pot_concproduct_.
 Contains results on competition for the traveling population by destinations. A low value indicates that a zone is at a disadvantage compared to other zones in reaching the traveling population.
+Uses the same prefix as [resultaten/motive/groups/herkomsten/time-of-day](#resultatenmotivegroupsherkomstentime-of-day) to indicate that this competition is on the traveling population and effects the potential reach of a destination.
 
 ### tussenresultaten/groepenverdeling/urbanization-scenario
 
