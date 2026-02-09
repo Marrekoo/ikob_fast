@@ -24,16 +24,16 @@ reference
 │               └───fossiel [f]
 ├───resultaten
 │   └───werk
-│       ├───alle groepen
-│       │   ├───bestemmingen
-│       │   │   └───restdag [f]
-│       │   └───herkomsten
-│       │       └───restdag [f]
-│       └───concurrentie
-│           ├───arbeidsplaatsen
+│       └───alle groepen
+│           ├───bestemmingen
 │           │   └───restdag [f]
-│           └───inwoners
-│               └───restdag [f]
+│           ├───herkomsten
+│           │   └───restdag [f]
+│           └───concurrentie
+│               ├───arbeidsplaatsen
+│               │   └───restdag [f]
+│               └───inwoners
+│                   └───restdag [f]
 └───tussenresultaten
     └───groepenverdeling
         └───2023 [f]
@@ -78,28 +78,27 @@ reference
 │   │
 │   └───werk            # Split by motive, motive defines the destination and traveling population used
 │       │
-│       ├───alle groepen    # Can contain results on the full population (alle groepen) or only on car owners (alleen autobezitters)
-│       │   │
-│       │   ├───bestemmingen    # Reachability of the destination by the traveling population
-│       │   │   │               # E.g. The reachability of employers by people aged 18-65
-│       │   │   └───restdag [f]     # Split by time of day
-│       │   │
-│       │   └───herkomsten      # Reachability of the traveling population by the destinations
-│       │       │               # E.g. The reachability of people aged 18-65 by employers
-│       │       └───restdag [f]     # Split by time of day
-│       │
-│       └───concurrentie    # Competition factor to indicate how much a zone has to compete with others
-│           │               # Note that these results are implicitly dependent on the all groups / groups with a car distinction
+│       └───alle groepen    # Can contain results on the full population (alle groepen) or only on car owners (alleen autobezitters)
 │           │
-│           ├───arbeidsplaatsen # Competition on destinations by the traveling population
-│           │   │               # Low if a zone is at a disadvantage compared to other zones in reaching destination
-│           │   │               # E.g. Low if an employee can only reach jobs that a far away, while those same jobs are nearby for other employees.
+│           ├───bestemmingen    # Reachability of the destination by the traveling population
+│           │   │               # E.g. The reachability of employers by people aged 18-65
 │           │   └───restdag [f]     # Split by time of day
 │           │
-│           └───inwoners        # Competition on the traveling population by destinations
-│               │               # Low if there are many destination spots and/or the traveling population is small
-│               │               # E.g. Low if employers can only reach employees that a far away, while those same employees are nearby other employers.
-│               └───restdag [f]     # Split by time of day
+│           ├───herkomsten      # Reachability of the traveling population by the destinations
+│           │   │               # E.g. The reachability of people aged 18-65 by employers
+│           │   └───restdag [f]     # Split by time of day
+│           │   
+│           └───concurrentie    # Competition factor to indicate how much a zone has to compete with others
+│               │
+│               ├───arbeidsplaatsen # Competition on destinations by the traveling population
+│               │   │               # Low if a zone is at a disadvantage compared to other zones in reaching destination
+│               │   │               # E.g. Low if an employee can only reach jobs that a far away, while those same jobs are nearby for other employees.
+│               │   └───restdag [f]     # Split by time of day
+│               │
+│               └───inwoners        # Competition on the traveling population by destinations
+│                   │               # Low if there are many destination spots and/or the traveling population is small
+│                   │               # E.g. Low if employers can only reach employees that a far away, while those same employees are nearby other employers.
+│                   └───restdag [f]     # Split by time of day
 │
 └───tussenresultaten    # Intermediate results that are stored in the file system, this only contains results on
     └───groepenverdeling  # The distribution of the population over [groups](./README.md#groups)
@@ -169,8 +168,7 @@ Each file name contains:
 
 And the results contain, for each movement from zone to zone, the highest weight out of all the modalities considered. 
 
-Each file is a matrix of #zones x #zones indicating the travel weight from zone to zone. 
-0 meaning a movement is impossible, 1 meaning it's frictionless
+Each file is a matrix of #zones x #zones indicating the travel weight from zone to zone. 0 meaning a movement is impossible, 1 meaning it's frictionless
 
 The file name and file path then indicate the:
 - motive
