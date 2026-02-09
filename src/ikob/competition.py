@@ -318,6 +318,7 @@ def competition(
                             income=income_group,
                             motive=motive,
                             modality=modality,
+                            group=car_possession_group,
                         )
                         competitions.set(key, competition_total.copy())
 
@@ -329,6 +330,7 @@ def competition(
                             subtopic=subtopic_competition,
                             income=income_group,
                             motive=motive,
+                            group=car_possession_group,
                         )
                         competitions.write_csv(general_totals_transpose, key, header=headstring)
 
@@ -344,6 +346,7 @@ def competition(
                             modality=modality,
                             income=income_group,
                             subtopic=subtopic_competition,
+                            group=car_possession_group,
                         )
                         general_matrix.append(competitions.get(key))
                     general_totals_transpose = utils.transpose(general_matrix)
@@ -366,6 +369,7 @@ def competition(
                         subtopic=subtopic_competition,
                         motive=motive,
                         modality=modality,
+                        group=car_possession_group,
                     )
                     competitions.write_csv(general_totals_transpose, key, header=header)
 
@@ -375,6 +379,7 @@ def competition(
                         subtopic=subtopic_competition,
                         motive=motive,
                         modality=modality,
+                        group=car_possession_group,
                     )
                     competitions.write_csv(general_matrix_product, key, header=header)
 
