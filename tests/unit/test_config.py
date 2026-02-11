@@ -1,4 +1,5 @@
 import json
+import logging
 import pathlib
 
 import pytest
@@ -115,7 +116,7 @@ def test_auto_fix_config():
     config = json.loads(old_config)
 
     msg = "The old configuration should initially be reported as invalid."
-    assert not validate_config(config), msg
+    assert not validate_config(config, log_lvl=logging.INFO), msg
 
     config = try_fix_incompatible_configuration(config)
 

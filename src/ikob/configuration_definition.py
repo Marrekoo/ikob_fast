@@ -76,8 +76,12 @@ def default_project_tab():
         },
         "motief": {
             "naam": config_item("Naam van het motief", DataType.TEXT, default="werk"),
-            "reizende populatie": config_item("Populatie bestand voor dit motief", DataType.FILE),
-            "bestemmingsplaatsen": config_item("Bestemmingen bestand voor dit motief", DataType.FILE),
+            "reizende populatie": config_item(
+                "Populatie bestand voor dit motief", DataType.FILE, default="Beroepsbevolking_inkomensklasse.csv"
+            ),
+            "bestemmingsplaatsen": config_item(
+                "Bestemmingen bestand voor dit motief", DataType.FILE, default="Arbeidsplaatsen_inkomensklasse.csv"
+            ),
             "TVOM": config_item(
                 "De te gebruiken tijdswaarde van geld (TVOM tab)",
                 DataType.CHOICE,
@@ -379,10 +383,12 @@ def project_name(config):
     return config["project"]["naam"]
 
 
-def validate_config(config, strict=True):
+def validate_config(config, strict=True, log_lvl=logging.WARNING):
     """Validate a config dictionary."""
 
-    return validate.validateConfigWithTemplate(config, default_configuration_definition(), strict=strict)
+    return validate.validateConfigWithTemplate(
+        config, default_configuration_definition(), strict=strict, log_lvl=log_lvl
+    )
 
 
 def try_fix_incompatible_configuration(config):
@@ -396,13 +402,14 @@ def try_fix_incompatible_configuration(config):
         transfer_to_advanced_tab,
         transfer_to_chains_tab,
         fiets_checklist_to_checkbox,
+        motieven_to_motief,
     ]
 
     default = default_config()
     for fixer in fixers:
         config = fixer(config)
         new_config = merge_configs(default, config)
-        if validate_config(new_config):
+        if validate_config(new_config, log_lvl=logging.INFO):
             logger.info("Auto fixed config")
             return new_config
     logger.warning("Could not auto fix configuration. Using provided config as-is.")
@@ -424,8 +431,7 @@ def transfer_to_advanced_tab(config):
 
     Introduced in commit `6c6684c`.
     """
-    msg = 'Trying to auto fix "geavanceerd" configuration entry.'
-    logger.warning(msg)
+    logger.info('Trying to auto fix "geavanceerd" configuration entry.')
 
     # There is nothing to fix if the deprecated key is not present.
     if "verdeling" not in config:
@@ -453,8 +459,7 @@ def transfer_to_chains_tab(config):
         # Cannot fix: ketens already present.
         return config
 
-    msg = 'Trying to auto fix "ketens" configuration entry.'
-    logger.warning(msg)
+    logger.info('Trying to auto fix "ketens" configuration entry.')
 
     group = "ketens"
     config[group] = {}
@@ -468,6 +473,18 @@ def transfer_to_chains_tab(config):
         "bestand": "",
     }
 
+    return config
+
+
+def motieven_to_motief(config):
+    if "motieven" in config["project"]:
+        if config["project"]["motieven"] == ["werk"]:
+            # This motief is the default new motive, so we can remove the motieven section and rely on the default
+            del config["project"]["motieven"]
+        else:
+            logger.warning(
+                "'motieven' defined in config other than the default 'werk' motief. Manually edit the config to use the new 'motief'"
+            )
     return config
 
 

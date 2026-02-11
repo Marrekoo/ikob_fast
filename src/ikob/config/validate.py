@@ -101,7 +101,7 @@ def _validateChoice(value, template):
     return True
 
 
-def validateConfigWithTemplate(config, template, strict=False):
+def validateConfigWithTemplate(config, template, strict=False, log_lvl=logging.WARNING):
     """
     Valideert een configuratie gegeven een template.
     Er wordt gekeken naar structuur en waarden van de bladen.
@@ -114,10 +114,11 @@ def validateConfigWithTemplate(config, template, strict=False):
     """
     templatekeys = [key for key in template.keys() if key != "label"]
     if not isinstance(config, dict):
-        logger.warning("Validation failed: config is not a dictionary.")
+        logger.log(log_lvl, "Validation failed: config is not a dictionary.")
         return False
     if strict and set(config.keys()) != set(templatekeys):
-        logger.warning(
+        logger.log(
+            log_lvl,
             "Validation failed: config keys do not match template keys in strict mode. "
             f"Config keys not in template: {set(config.keys()) - set(templatekeys)}; "
             f"Template keys not in config: {set(templatekeys) - set(config.keys())}",
@@ -126,7 +127,7 @@ def validateConfigWithTemplate(config, template, strict=False):
     for key in templatekeys:
         if not strict:
             if key not in config:
-                logger.warning(f"Validation failed: key '{key}' is missing in config but present in template.")
+                logger.log(log_lvl, f"Validation failed: key '{key}' is missing in config but present in template.")
                 return False
         if "type" in template[key]:
             check = {
@@ -139,11 +140,12 @@ def validateConfigWithTemplate(config, template, strict=False):
                 "choice": _validateChoice,
             }
             if not check.get(template[key]["type"], _false)(config[key], template[key]):
-                logger.warning(
-                    f"Validation failed for key '{key}' with value '{config[key]}' and template '{template[key]}'"
+                logger.log(
+                    log_lvl,
+                    f"Validation failed for key '{key}' with value '{config[key]}' and template '{template[key]}'",
                 )
                 return False
         elif type(template[key]) is dict:
-            if not validateConfigWithTemplate(config[key], template[key], strict=strict):
+            if not validateConfigWithTemplate(config[key], template[key], strict=strict, log_lvl=log_lvl):
                 return False
     return True
