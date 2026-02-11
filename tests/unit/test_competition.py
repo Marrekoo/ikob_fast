@@ -174,7 +174,7 @@ def test_competition_on_jobs_per_capita_sensitivity(
         {
             ("Beroepsbevolking_inkomensklasse", "2023"): citizens_income,
             ("Arbeidsplaatsen_inkomensklasse", "2023"): jobs_income_present,
-            ("Verdeling_over_groepen_Beroepsbevolking", "2023"): distribution,
+            ("Verdeling_over_groepen", "2023"): distribution,
         }
     )
 
@@ -203,7 +203,11 @@ def test_competition_on_jobs_per_capita_sensitivity(
         "project": {
             "verstedelijkingsscenario": "2023",
             "beprijzingsregime": regime,
-            "motieven": [motive],
+            "motief": {
+                "naam": motive,
+                "reizende populatie": "path/to/Beroepsbevolking_inkomensklasse",
+                "bestemmingsplaatsen": "path/to/Arbeidsplaatsen_inkomensklasse",
+            },
             "paden": {
                 "output_directory": "out",
                 "skims_directory": "skims",
