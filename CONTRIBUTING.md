@@ -110,6 +110,7 @@ Follow the instructions in the readme under [Installation and usage (manual inst
    ```bash
    pytest .
    ```
+   for more about testing see [the relevant section in the readme](README.md#testing)
 
 
 
