@@ -12,15 +12,12 @@ logger = logging.getLogger(__name__)
 
 
 def file_to_frame(path: pathlib.Path) -> pd.DataFrame:
-    if path.suffix == ".xlsx":
-        return pd.read_excel(path)
-
     if path.suffix == ".csv":
         try:
             return pd.read_csv(path, dtype=float, header=None)
         except ValueError:
             return pd.read_csv(path, dtype=float)
-    raise ValueError(f"Calling file to frame with unknown extension {path.suffix}. Must be either .csv or .xlsx.")
+    raise ValueError(f"Calling file to frame with unknown extension {path.suffix}. Must be .csv")
 
 
 def is_equal_excel_csv(result: pathlib.Path, reference: pathlib.Path) -> bool:
@@ -39,7 +36,7 @@ def is_equal_excel_csv(result: pathlib.Path, reference: pathlib.Path) -> bool:
 def is_equal_file(result: pathlib.Path, reference: pathlib.Path) -> bool:
     """Compare if two files are the same.
 
-    For Excel (.xlsx) and CSV (.csv) files a specialised comparison
+    For Excel (.xlsx) and CSV (.csv) files a specialized comparison
     is used to allow for some numerical tolerances to exist between
     both files.
     """

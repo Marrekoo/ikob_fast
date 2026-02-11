@@ -180,7 +180,6 @@ def test_competition_on_jobs_per_capita_sensitivity(
 
     monkeypatch.setattr(comp, "get_weight_matrix", lambda *args, **kwargs: weight_matrix)
     monkeypatch.setattr(comp.DataSource, "write_csv", lambda *args, **kwargs: None)
-    monkeypatch.setattr(comp.DataSource, "write_xlsx", lambda *args, **kwargs: None)
 
     class _Origins:
         def get(self, _key: DataKey):
@@ -198,6 +197,7 @@ def test_competition_on_jobs_per_capita_sensitivity(
         def get(self, _key):
             return weight_matrix
 
+    which_groups = "alle groepen"
     config = {
         "__filename__": "pytest",
         "project": {
@@ -212,7 +212,7 @@ def test_competition_on_jobs_per_capita_sensitivity(
         },
         "skims": {"dagsoort": [pod]},
         "verdeling": {"Percelektrisch": {"laag": 0.0, "middellaag": 0.0, "middelhoog": 0.0, "hoog": 0.0}},
-        "geavanceerd": {"welke_groepen": ["alle groepen"]},
+        "geavanceerd": {"welke_groepen": [which_groups]},
     }
 
     # Act
@@ -226,6 +226,7 @@ def test_competition_on_jobs_per_capita_sensitivity(
         income=income_group,
         motive=motive,
         modality=modality,
+        group=which_groups,
     )
     total = competitions.get(key)
 

@@ -61,14 +61,13 @@ def employment_opportunities_setup(request, monkeypatch, segs_capture):
     # Use the parametrized weight matrix
     monkeypatch.setattr(employment_opportunities, "get_weight_matrix", lambda *args, **kwargs: request.param)
 
-    # Capture xlsx writes
-    xlsx_writes = []
+    # Capture csv writes
+    csv_writes = []
 
-    def capture_write_xlsx(self, data, key, header=None):
-        xlsx_writes.append({"data": data, "key": key, "header": header})
+    def capture_write_csv(self, data, key, header=None):
+        csv_writes.append({"data": data, "key": key, "header": header})
 
-    monkeypatch.setattr(employment_opportunities.DataSource, "write_csv", lambda *args, **kwargs: None)
-    monkeypatch.setattr(employment_opportunities.DataSource, "write_xlsx", capture_write_xlsx)
+    monkeypatch.setattr(employment_opportunities.DataSource, "write_csv", capture_write_csv)
 
     class _Weights:
         def get(self, _key):
@@ -96,7 +95,7 @@ def employment_opportunities_setup(request, monkeypatch, segs_capture):
 
     return {
         "potencies": potencies,
-        "xlsx_writes": xlsx_writes,
+        "csv_writes": csv_writes,
         "pod": pod,
         "motive": motive,
         "working_pop_income": working_pop_income,
@@ -140,15 +139,15 @@ def test_employment_opportunities_totals(modality, income_group, income_index, e
 
 @pytest.mark.parametrize("modality", modalities)
 def test_employment_opportunities_ontpl_totaal(modality, employment_opportunities_setup):
-    """Ontpl_totaal xlsx output shows reachability by income group, independent of distribution over groups."""
+    """Ontpl_totaal csv output shows reachability by income group, independent of distribution over groups."""
 
-    xlsx_writes = employment_opportunities_setup["xlsx_writes"]
+    csv_writes = employment_opportunities_setup["csv_writes"]
     working_pop_income = employment_opportunities_setup["working_pop_income"]
     jobs_income = employment_opportunities_setup["jobs_income"]
     weight_matrix = employment_opportunities_setup["weight_matrix"]
 
-    # Test Ontpl_totaal xlsx write (per modality, showing reachability by income group)
-    ontpl_totaal_writes = [w for w in xlsx_writes if w["key"].id == "Ontpl_totaal" and w["key"].modality == modality]
+    # Test Ontpl_totaal csv write (per modality, showing reachability by income group)
+    ontpl_totaal_writes = [w for w in csv_writes if w["key"].id == "Ontpl_totaal" and w["key"].modality == modality]
     assert len(ontpl_totaal_writes) == 1, f"Expected exactly one Ontpl_totaal write for modality {modality}"
 
     ontpl_totaal_data = ontpl_totaal_writes[0]["data"]
@@ -158,9 +157,9 @@ def test_employment_opportunities_ontpl_totaal(modality, employment_opportunitie
     # Output files get rounded to integers for presentation
     np.testing.assert_allclose(ontpl_totaal_data, np.round(ontpl_totaal_expected))
 
-    # Test Ontpl_totaalproduct xlsx write (product of reachability and population)
+    # Test Ontpl_totaalproduct csv write (product of reachability and population)
     ontpl_product_writes = [
-        w for w in xlsx_writes if w["key"].id == "Ontpl_totaalproduct" and w["key"].modality == modality
+        w for w in csv_writes if w["key"].id == "Ontpl_totaalproduct" and w["key"].modality == modality
     ]
     assert len(ontpl_product_writes) == 1, f"Expected exactly one Ontpl_totaalproduct write for modality {modality}"
 

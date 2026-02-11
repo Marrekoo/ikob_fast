@@ -62,14 +62,13 @@ def potential_companies_setup(request, monkeypatch, segs_capture):
         def get(self, _key):
             return request.param
 
-    # Capture xlsx writes
-    xlsx_writes = []
+    # Capture csv writes
+    csv_writes = []
 
-    def capture_write_xlsx(self, data, key, header=None):
-        xlsx_writes.append({"data": data, "key": key, "header": header})
+    def capture_write_csv(self, data, key, header=None):
+        csv_writes.append({"data": data, "key": key, "header": header})
 
-    monkeypatch.setattr(pc.DataSource, "write_csv", lambda *args, **kwargs: None)
-    monkeypatch.setattr(pc.DataSource, "write_xlsx", capture_write_xlsx)
+    monkeypatch.setattr(pc.DataSource, "write_csv", capture_write_csv)
 
     config = {
         "__filename__": "pytest",
@@ -93,7 +92,7 @@ def potential_companies_setup(request, monkeypatch, segs_capture):
 
     return {
         "origins": origins,
-        "xlsx_writes": xlsx_writes,
+        "csv_writes": csv_writes,
         "pod": pod,
         "motive": motive,
         "working_pop_income": working_pop_income,
@@ -135,15 +134,15 @@ def test_potential_companies_totals(modality, income_group, income_index, potent
 
 @pytest.mark.parametrize("modality", modalities)
 def test_potential_companies_pot_totaal(modality, potential_companies_setup):
-    """Pot_totaal xlsx output shows reachability by income group, independent of distribution over groups."""
+    """Pot_totaal csv output shows reachability by income group, independent of distribution over groups."""
 
-    xlsx_writes = potential_companies_setup["xlsx_writes"]
+    csv_writes = potential_companies_setup["csv_writes"]
     working_pop_income = potential_companies_setup["working_pop_income"]
     jobs_income = potential_companies_setup["jobs_income"]
     weight_matrix = potential_companies_setup["weight_matrix"]
 
-    # Test Pot_totaal xlsx write (per modality, showing reachability by income group)
-    pot_totaal_writes = [w for w in xlsx_writes if w["key"].id == "Pot_totaal" and w["key"].modality == modality]
+    # Test Pot_totaal csv write (per modality, showing reachability by income group)
+    pot_totaal_writes = [w for w in csv_writes if w["key"].id == "Pot_totaal" and w["key"].modality == modality]
     assert len(pot_totaal_writes) == 1, f"Expected exactly one Pot_totaal write for modality {modality}"
 
     pot_totaal_data = pot_totaal_writes[0]["data"]
@@ -153,10 +152,8 @@ def test_potential_companies_pot_totaal(modality, potential_companies_setup):
     # Output files get rounded to integers for presentation
     np.testing.assert_array_equal(pot_totaal_data, np.round(pot_totaal_expected))
 
-    # Test Pot_totaalproduct xlsx write (product of reachability and jobs)
-    pot_product_writes = [
-        w for w in xlsx_writes if w["key"].id == "Pot_totaalproduct" and w["key"].modality == modality
-    ]
+    # Test Pot_totaalproduct csv write (product of reachability and jobs)
+    pot_product_writes = [w for w in csv_writes if w["key"].id == "Pot_totaalproduct" and w["key"].modality == modality]
     assert len(pot_product_writes) == 1, f"Expected exactly one Pot_totaalproduct write for modality {modality}"
 
     pot_product_data = pot_product_writes[0]["data"]

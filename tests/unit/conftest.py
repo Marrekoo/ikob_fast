@@ -8,7 +8,6 @@ class SegsCapture:
     def __init__(self, data_by_key):
         self.data_by_key = data_by_key
         self.writes_csv = []
-        self.writes_xlsx = []
 
     def read(self, id: str, type_caster=int, scenario=""):
         key = (id, scenario)
@@ -18,18 +17,6 @@ class SegsCapture:
 
     def write_csv(self, data, id, header, group="", modifier="", scenario=""):
         self.writes_csv.append(
-            {
-                "id": id,
-                "group": group,
-                "modifier": modifier,
-                "scenario": scenario,
-                "header": list(header),
-                "data": np.array(data),
-            }
-        )
-
-    def write_xlsx(self, data, id, header, group="", modifier="", scenario=""):
-        self.writes_xlsx.append(
             {
                 "id": id,
                 "group": group,

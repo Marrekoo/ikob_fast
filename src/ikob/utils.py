@@ -1,7 +1,6 @@
 import pathlib
 
 import numpy as np
-import xlsxwriter
 
 
 def zeros(lengte):
@@ -10,19 +9,6 @@ def zeros(lengte):
 
 def transpose(matrix):
     return np.array(matrix).T
-
-
-def write_xls(matrix, filenaam, header):
-    if not isinstance(filenaam, pathlib.Path):
-        filenaam = pathlib.Path(filenaam)
-
-    workbook = xlsxwriter.Workbook(filenaam)
-    worksheet = workbook.add_worksheet()
-    worksheet.write_row(0, 0, header)
-    for r in range(0, len(matrix)):
-        worksheet.write(r + 1, 0, r + 1)
-        worksheet.write_row(r + 1, 1, matrix[r])
-    workbook.close()
 
 
 def read_csv(filenaam, type_caster=float):
