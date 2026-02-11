@@ -385,7 +385,6 @@ def project_name(config):
 
 def validate_config(config, strict=True, log_lvl=logging.WARNING):
     """Validate a config dictionary."""
-
     return validate.validateConfigWithTemplate(
         config, default_configuration_definition(), strict=strict, log_lvl=log_lvl
     )

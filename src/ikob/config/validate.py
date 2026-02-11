@@ -1,8 +1,54 @@
 ### Validate the template
 
 import logging
+import os
+from pathlib import Path
+
+from ikob.datasource import SegsSource
 
 logger = logging.getLogger(__name__)
+
+
+def validate_config_files(config, filename):
+    config["__filename__"] = os.path.splitext(os.path.basename(filename))[0]
+    valid = motive_file_validation(config)
+    if not valid:
+        logger.warning(
+            "Unable to run ikob with the current config + input directory.",
+        )
+    return valid
+
+
+def motive_file_validation(config):
+    motive = config["project"]["motief"]
+    scenario = config["project"]["verstedelijkingsscenario"]
+
+    traveling_population_path = Path(motive["reizende populatie"])
+    destinations_path = Path(motive["bestemmingsplaatsen"])
+
+    segs_source = SegsSource(config)
+
+    valid = True
+
+    try:
+        segs_source.read(traveling_population_path.name, scenario=scenario)
+    except Exception as e:
+        logger.warning(
+            "a problem occurred while attempting to load the motive's traveling population files: \n",
+            exc_info=e,
+        )
+        valid &= False
+
+    try:
+        segs_source.read(destinations_path.name, scenario=scenario)
+    except Exception as e:
+        logger.warning(
+            "a problem while attempting to load the motive's destination files: \n",
+            exc_info=e,
+        )
+        valid &= False
+
+    return valid
 
 
 def _validateDefaultType(valtype, defvalue):

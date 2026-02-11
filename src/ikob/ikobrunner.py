@@ -7,7 +7,7 @@ from tkinter import BooleanVar, Button, Frame, StringVar, Tk, Widget, filedialog
 
 from ikob.combined_weights import calculate_combined_weights
 from ikob.competition import competition_on_citizens, competition_on_jobs
-from ikob.config import widgets
+from ikob.config import validate, widgets
 from ikob.datasource import DataSource, DataType
 from ikob.distribute_over_groups import distribute_population_over_groups
 from ikob.employment_opportunities import employment_opportunities
@@ -35,6 +35,10 @@ def run_scripts(project_file, skip_steps: list[bool] | None = None, write_weight
     """
     logger.info("Reading project file: %s.", project_file)
     config = get_config_from_args(project_file)
+
+    valid = validate.motive_file_validation(config)
+    if not valid:
+        raise ValueError("Invalid motive files, see console warnings.")
 
     logger.info("Starting simulations...")
     if not skip_steps:
@@ -94,8 +98,6 @@ def run_scripts(project_file, skip_steps: list[bool] | None = None, write_weight
 
 
 # User interface
-
-
 class ConfigApp(Tk):
     PAD_X = 5
     PAD_Y = 5
