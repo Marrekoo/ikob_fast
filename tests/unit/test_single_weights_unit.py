@@ -1,8 +1,6 @@
 import numpy as np
 import pytest
 
-from ikob.configuration_definition import DecayCurveName, TvomType
-
 
 @pytest.mark.parametrize("modality", ["Auto", "OV", "Fiets"])
 @pytest.mark.parametrize("preference", ["Auto", "OV", "Fiets"])
@@ -37,6 +35,7 @@ def test_calculate_weights_threshold_and_monotonicity(modality, preference):
 
 def test_calculate_single_weights_writes_expected_keys():
     import ikob.single_weights as sw
+    from ikob.configuration_definition import DecayCurveName, TvomType
     from ikob.datasource import DataKey
 
     # Prepare

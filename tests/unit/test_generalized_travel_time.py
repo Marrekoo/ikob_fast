@@ -1,8 +1,6 @@
 import numpy as np
 import pytest
 
-from ikob.configuration_definition import DecayCurveName, TvomType
-
 
 def test_costs_public_transport_pricecap_and_starting_rate():
     from ikob.generalized_travel_time import costs_public_transport
@@ -36,6 +34,8 @@ def test_costs_public_transport_pricecap_and_starting_rate():
 
 
 def setup_generalized_travel_time_input(monkeypatch, gtt):
+    from ikob.configuration_definition import DecayCurveName, TvomType
+
     pod = "Restdag"
     motive = "werk"
     regime = "Basis"
