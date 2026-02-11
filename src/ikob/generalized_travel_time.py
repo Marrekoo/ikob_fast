@@ -64,6 +64,7 @@ def generalized_travel_time(config) -> DataSource:
     parking_costs = advanced_config["parkeerkosten"]["gebruiken"]
     pricecap = skims_config["pricecap"]["gebruiken"]
     pricecap_value = skims_config["pricecap"]["getal"]
+    bike_cost_euro_per_km = skims_config["bike_cost_ct_per_km"] / 100
     parking_times_temporary = read_csv_from_config(config, key="skims", id="parkeerzoektijden_bestand")
 
     if parking_costs:
@@ -101,12 +102,18 @@ def generalized_travel_time(config) -> DataSource:
             car_time_matrix = skims_reader.read("Auto_Tijd", pod)
             car_distance_matrix = skims_reader.read("Auto_Afstand", pod)
             bike_time_matrix = skims_reader.read("Fiets_Tijd", pod)
+            # Use a default speed to compute distance from time if distance is not directly available
+            default_speed_km_p_minute = 15 / 60
+            bike_distance_matrix = skims_reader.read(
+                "Fiets_Afstand", pod, default=(bike_time_matrix * default_speed_km_p_minute)
+            )
             pt_time_matrix = skims_reader.read("OV_Tijd", pod)
 
             num_zones = _check_size_assumptions(
                 car_time_matrix,
                 car_distance_matrix,
                 bike_time_matrix,
+                bike_distance_matrix,
                 pt_time_matrix,
                 parking_cost_array,
                 parking_times,
@@ -124,10 +131,12 @@ def generalized_travel_time(config) -> DataSource:
                 )
 
             # Bike generalized travel time:
-            gtr_skim = np.where(bike_time_matrix < 180, bike_time_matrix, 9999)
+            for income_level in income_levels:
+                tvom_min_per_euro = tvom.get(income_level)
+                gtr_skim = bike_time_matrix + tvom_min_per_euro * bike_distance_matrix * bike_cost_euro_per_km
 
-            key = DataKey(id="Fiets", part_of_day=pod, regime=regime, motive=motive)
-            generalized_travel_time.set(key, gtr_skim.copy())
+                key = DataKey(id="Fiets", part_of_day=pod, regime=regime, motive=motive, income=income_level)
+                generalized_travel_time.set(key, gtr_skim.copy())
 
             gtr_skim = np.zeros((num_zones, num_zones))
             for income_level in income_levels:
@@ -235,6 +244,7 @@ def _check_size_assumptions(
     car_time_matrix: np.ndarray,
     car_distance_matrix: np.ndarray,
     bike_time_matrix: np.ndarray,
+    bike_distance_matrix: np.ndarray,
     pt_time_matrix: np.ndarray,
     parking_cost_array: np.ndarray,
     parking_times: np.ndarray | list[list[int]],
@@ -247,7 +257,7 @@ def _check_size_assumptions(
         car_time_matrix.shape
         == car_distance_matrix.shape
         == bike_time_matrix.shape
-        == bike_time_matrix.shape
+        == bike_distance_matrix.shape
         == pt_time_matrix.shape
         and pt_time_matrix.shape[0] == pt_time_matrix.shape[1]
     ), (

@@ -5,6 +5,8 @@ import pathlib
 from dataclasses import dataclass
 from typing import Optional, Type
 
+import numpy as np
+import numpy.typing as npt
 from numpy.typing import NDArray
 
 import ikob.utils as utils
@@ -87,14 +89,17 @@ class SkimsSource:
             raise DataSourceError("Skims source initialized with empty skims dir")
         self.skims_dir = pathlib.Path(skims_dir)
 
-    def read(self, id: str, dagdeel: str, type_caster=float):
+    def read(self, id: str, dagdeel: str, type_caster=float, default: npt.NDArray = np.array([])) -> npt.NDArray:
         """Read skims from disk.
 
         Reads the skim file formed by the identifier and dagdeel.
         The ``type_caster`` allows to cast the data to a desired type.
         """
         path = (self.skims_dir / dagdeel / id).with_suffix(".csv")
-        return utils.read_csv(path, type_caster=type_caster)
+        if os.path.exists(path):
+            return utils.read_csv(path, type_caster=type_caster)
+        logger.warning(f"Skim file {path} not found, using default.")
+        return default
 
 
 class SegsSource:

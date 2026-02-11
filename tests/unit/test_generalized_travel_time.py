@@ -42,6 +42,7 @@ def setup_generalized_travel_time_input(monkeypatch, gtt):
     car_time = np.array([[10.0, 20.0, 30.0], [40.0, 50.0, 60.0], [70.0, 80.0, 90.0]])
     car_dist = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]])
     bike_time = np.array([[100.0, 200.0, 150.0], [50.0, 180.0, 170.0], [160.0, 175.0, 190.0]])
+    bike_distance = np.array([[5.0, 10.0, 8.0], [4.0, 9.0, 7.0], [6.0, 11.0, 9.0]])
     pt_time = np.array([[1.0, 2.0, 3.0], [0.4, 5.0, 6.0], [7.0, 8.0, 9.0]])
     pt_dist = np.array([[0.0, 10.0, 20.0], [20.0, 30.0, 40.0], [5.0, 15.0, 25.0]])
 
@@ -49,13 +50,14 @@ def setup_generalized_travel_time_input(monkeypatch, gtt):
         ("Auto_Tijd", pod): car_time,
         ("Auto_Afstand", pod): car_dist,
         ("Fiets_Tijd", pod): bike_time,
+        ("Fiets_Afstand", pod): bike_distance,
         ("OV_Tijd", pod): pt_time,
         ("OV_Afstand", pod): pt_dist,
     }
 
     def fake_skims_source(_skims_dir):
         class _Reader:
-            def read(self, id: str, dagdeel: str, type_caster=float):
+            def read(self, id: str, dagdeel: str, type_caster=float, default=None):
                 return np.array(skims_data[(id, dagdeel)], dtype=type_caster)
 
         return _Reader()
@@ -102,6 +104,7 @@ def setup_generalized_travel_time_input(monkeypatch, gtt):
             "tijdkostenga": {"GeenAuto": 0.05, "GeenRijbewijs": 0.1},
             "dagsoort": [pod],
             "parkeerzoektijden_bestand": "unused.csv",
+            "bike_cost_ct_per_km": -5.0,
         },
         "TVOM": {
             "werk": {"laag": 0.1, "middellaag": 0.4, "middelhoog": 0.5, "hoog": 0.7},
@@ -116,23 +119,37 @@ def setup_generalized_travel_time_input(monkeypatch, gtt):
             "bestemmingslijst": {"gebruiken": False},
         },
     }
-    return (config, pod, regime, motive, income, car_time, car_dist, bike_time, pt_time, pt_dist, parking_times)
+    return (
+        config,
+        pod,
+        regime,
+        motive,
+        income,
+        car_time,
+        car_dist,
+        bike_time,
+        bike_distance,
+        pt_time,
+        pt_dist,
+        parking_times,
+    )
 
 
 def test_generalized_travel_time_fiets(monkeypatch):
     import ikob.generalized_travel_time as gtt
     from ikob.datasource import DataKey
 
-    config, pod, regime, motive, income, car_time, car_dist, bike_time, pt_time, pt_dist, parking_times = (
-        setup_generalized_travel_time_input(monkeypatch, gtt)
+    config, pod, regime, motive, income, _, _, bike_time, bike_distance, _, _, _ = setup_generalized_travel_time_input(
+        monkeypatch, gtt
     )
 
     datasource = gtt.generalized_travel_time(config)
 
-    fiets_key = DataKey(id="Fiets", part_of_day=pod, regime=regime, motive=motive)
+    fiets_key = DataKey(id="Fiets", part_of_day=pod, regime=regime, motive=motive, income=income)
     fiets = datasource.get(fiets_key)
-    # 9999 is used as a max in the source code.
-    expected_fiets = np.where(bike_time < 180, bike_time, 9999)
+    expected_fiets = (
+        bike_time + config["TVOM"][motive][income] * bike_distance * config["skims"]["bike_cost_ct_per_km"] / 100
+    )
     np.testing.assert_allclose(fiets, expected_fiets)
 
 
@@ -141,8 +158,8 @@ def test_generalized_travel_time_public_transport(monkeypatch):
     from ikob.datasource import DataKey
     from ikob.generalized_travel_time import costs_public_transport
 
-    config, pod, regime, motive, income, car_time, car_dist, bike_time, pt_time, pt_dist, parking_times = (
-        setup_generalized_travel_time_input(monkeypatch, gtt)
+    config, pod, regime, motive, income, _, _, _, _, pt_time, pt_dist, _ = setup_generalized_travel_time_input(
+        monkeypatch, gtt
     )
 
     datasource = gtt.generalized_travel_time(config)
@@ -170,9 +187,7 @@ def test_generalized_travel_time_free_public_transport(monkeypatch):
     import ikob.generalized_travel_time as gtt
     from ikob.datasource import DataKey
 
-    config, pod, regime, motive, income, car_time, car_dist, bike_time, pt_time, pt_dist, parking_times = (
-        setup_generalized_travel_time_input(monkeypatch, gtt)
-    )
+    config, pod, regime, motive, _, _, _, _, _, pt_time, _, _ = setup_generalized_travel_time_input(monkeypatch, gtt)
 
     datasource = gtt.generalized_travel_time(config)
 
@@ -186,7 +201,7 @@ def test_generalized_travel_time_auto_fossiel(monkeypatch):
     import ikob.generalized_travel_time as gtt
     from ikob.datasource import DataKey
 
-    config, pod, regime, motive, income, car_time, car_dist, bike_time, pt_time, pt_dist, parking_times = (
+    config, pod, regime, motive, income, car_time, car_dist, _, _, _, _, parking_times = (
         setup_generalized_travel_time_input(monkeypatch, gtt)
     )
 
@@ -207,8 +222,8 @@ def test_generalized_travel_time_geen_auto(monkeypatch):
     import ikob.generalized_travel_time as gtt
     from ikob.datasource import DataKey
 
-    config, pod, regime, motive, income, car_time, car_dist, bike_time, pt_time, pt_dist, parking_times = (
-        setup_generalized_travel_time_input(monkeypatch, gtt)
+    config, pod, regime, motive, income, car_time, car_dist, _, _, _, _, _ = setup_generalized_travel_time_input(
+        monkeypatch, gtt
     )
 
     datasource = gtt.generalized_travel_time(config)
@@ -231,8 +246,8 @@ def test_generalized_travel_time_geen_rijbewijs(monkeypatch):
     import ikob.generalized_travel_time as gtt
     from ikob.datasource import DataKey
 
-    config, pod, regime, motive, income, car_time, car_dist, bike_time, pt_time, pt_dist, parking_times = (
-        setup_generalized_travel_time_input(monkeypatch, gtt)
+    config, pod, regime, motive, income, car_time, car_dist, _, _, _, _, _ = setup_generalized_travel_time_input(
+        monkeypatch, gtt
     )
 
     datasource = gtt.generalized_travel_time(config)
@@ -254,7 +269,7 @@ def test_generalized_travel_time_includes_additional_and_parking_costs(monkeypat
     import ikob.generalized_travel_time as gtt
     from ikob.datasource import DataKey
 
-    config, pod, regime, motive, income, car_time, car_dist, bike_time, pt_time, pt_dist, parking_times = (
+    config, pod, regime, motive, income, car_time, car_dist, _, _, _, _, parking_times = (
         setup_generalized_travel_time_input(monkeypatch, gtt)
     )
 

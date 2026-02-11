@@ -141,7 +141,6 @@ def employment_opportunities(config, single_weights: DataSource, combined_weight
                                     regime,
                                     part_of_day,
                                     income,
-                                    income_group,
                                     K,
                                 )
 

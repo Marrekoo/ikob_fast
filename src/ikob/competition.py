@@ -29,7 +29,6 @@ def get_weight_matrix(
     regime,
     part_of_day,
     income,
-    income_group,
     ratio_electric: float,
 ):
     preference = utils.find_preference(group, modality)
@@ -37,7 +36,12 @@ def get_weight_matrix(
     if modality == "Fiets" or modality == "EFiets":
         preference_bike = "Fiets" if preference == "Fiets" else ""
         key = DataKey(
-            f"{modality}_vk", part_of_day=part_of_day, regime=regime, motive=motive, preference=preference_bike
+            f"{modality}_vk",
+            part_of_day=part_of_day,
+            regime=regime,
+            motive=motive,
+            preference=preference_bike,
+            income=income,
         )
         return single_weights.get(key)
 
@@ -285,7 +289,6 @@ def competition(
                                     regimes,
                                     part_of_day,
                                     income,
-                                    income_group,
                                     K,
                                 )
 

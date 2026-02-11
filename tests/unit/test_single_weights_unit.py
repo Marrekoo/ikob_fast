@@ -69,7 +69,10 @@ def test_calculate_single_weights_writes_expected_keys():
 
     # Assert
     # A set of representative keys that must be produced.
-    assert weights.get(DataKey("Fiets_vk", part_of_day=pod, regime=regime, motive=motive)).shape == (2, 2)
+    assert weights.get(DataKey("Fiets_vk", part_of_day=pod, regime=regime, motive=motive, income="laag")).shape == (
+        2,
+        2,
+    )
     assert weights.get(
         DataKey(
             "Auto_vk",
