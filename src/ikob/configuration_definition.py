@@ -1,5 +1,5 @@
 import logging
-from enum import Enum
+from enum import Enum, StrEnum
 
 from ikob.config import build, validate
 
@@ -44,6 +44,17 @@ def config_item(
     return dictionary
 
 
+class DecayCurveName(StrEnum):
+    WORK_AND_SOCIAL = "werk en sociaal-recreatief"
+    DAILY_SHOPPING_AND_HEALTH = "dagelijkse boodschappen en zorg"
+    NON_DAILY_SHOPPING_AND_EDUCATION = "niet-dagelijkse boodschappen en onderwijs"
+
+
+class TvomType(StrEnum):
+    WORK = "werk"
+    OTHER = "overig"
+
+
 def default_project_tab():
     return {
         "label": "Project",
@@ -63,12 +74,23 @@ def default_project_tab():
             "segs_directory": config_item("SEGS directory", DataType.DIRECTORY),
             "output_directory": config_item("Output directory", DataType.DIRECTORY, default="output"),
         },
-        "motieven": config_item(
-            "Motieven",
-            DataType.CHECKLIST,
-            default="werk",
-            items=["werk", "winkeldagelijkszorg", "winkelnietdagelijksonderwijs", "sociaal-recreatief"],
-        ),
+        "motief": {
+            "naam": config_item("Naam van het motief", DataType.TEXT, default="werk"),
+            "reizende populatie": config_item("Populatie bestand voor dit motief", DataType.FILE),
+            "bestemmingsplaatsen": config_item("Bestemmingen bestand voor dit motief", DataType.FILE),
+            "TVOM": config_item(
+                "De te gebruiken tijdswaarde van geld (TVOM tab)",
+                DataType.CHOICE,
+                default=TvomType.WORK,
+                items=list(TvomType),
+            ),
+            "reistijdvervalscurve": config_item(
+                "De te gebruiken reistijd vervalscurve",
+                DataType.CHOICE,
+                default=DecayCurveName.WORK_AND_SOCIAL,
+                items=list(DecayCurveName),
+            ),
+        },
         "fiets of E-fiets": {
             "label": "Rekenen met Fiets of E-fiets",
             "E-fiets": config_item(
@@ -191,7 +213,7 @@ def default_skims_tab():
     }
 
 
-def default_tovm_tab():
+def default_tvom_tab():
     levels = ["Hoog", "Middelhoog", "Middellaag", "Laag"]
     werk_values = [4, 6, 9, 12]
 
@@ -208,11 +230,11 @@ def default_tovm_tab():
 
     return {
         "label": "Waarde van tijd",
-        "werk": {
+        TvomType.WORK: {
             "label": "Waarde van 1€ kosten in gegeneraliseerde reistijd per inkomensgroep, motief werk",
             **werk_levels,
         },
-        "overig": {
+        TvomType.OTHER: {
             "label": "Waarde van 1€ kosten in gegeneraliseerde reistijd per inkomensgroep, motief overig",
             **overig_levels,
         },
@@ -337,7 +359,7 @@ def default_configuration_definition():
 
     project_tab = default_project_tab()
     skims_tab = default_skims_tab()
-    tovm_tab = default_tovm_tab()
+    tvom_tab = default_tvom_tab()
     verdeling_tab = default_verdeling_tab()
     chains_and_hubs_tab = default_chains_and_hubs_tab()
     advanced_tab = default_advanced_tab()
@@ -345,7 +367,7 @@ def default_configuration_definition():
     return {
         "project": project_tab,
         "skims": skims_tab,
-        "TVOM": tovm_tab,
+        "TVOM": tvom_tab,
         "verdeling": verdeling_tab,
         "ketens": chains_and_hubs_tab,
         "geavanceerd": advanced_tab,

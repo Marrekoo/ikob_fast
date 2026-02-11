@@ -69,9 +69,13 @@
       "hoog"
     ],
     "naam": "eindhoven-500",
-    "motieven": [
-      "werk"
-    ],
+    "motief": {
+      "naam": "werk",
+      "reizende populatie": "tests/eindhoven-500/SEGS/2018/Beroepsbevolking_inkomensklasse.csv",
+      "bestemmingsplaatsen": "tests/eindhoven-500/SEGS/2018/Arbeidsplaatsen_inkomensklasse.csv",
+      "TVOM": "werk",
+      "reistijdvervalscurve": "werk en sociaal-recreatief"
+    },
     "fiets of E-fiets": {
         "E-fiets": false
     },
