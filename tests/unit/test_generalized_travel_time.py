@@ -1,6 +1,8 @@
 import numpy as np
 import pytest
 
+from ikob.configuration_definition import DecayCurveName, TvomType
+
 
 def test_costs_public_transport_pricecap_and_starting_rate():
     from ikob.generalized_travel_time import costs_public_transport
@@ -87,7 +89,13 @@ def setup_generalized_travel_time_input(monkeypatch, gtt):
         "project": {
             "verstedelijkingsscenario": "2023",
             "beprijzingsregime": regime,
-            "motieven": [motive],
+            "motief": {
+                "naam": motive,
+                "reizende populatie": "path",
+                "bestemmingsplaatsen": "path",
+                "TVOM": TvomType.WORK,
+                "reistijdvervalscurve": DecayCurveName.WORK_AND_SOCIAL,
+            },
             "paden": {
                 "skims_directory": "skims",
                 "output_directory": "out",
