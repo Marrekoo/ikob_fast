@@ -54,7 +54,7 @@ def potential_companies_setup(request, monkeypatch, segs_capture):
         {
             ("Beroepsbevolking_inkomensklasse", "2023"): working_pop_income,
             ("Arbeidsplaatsen_inkomensklasse", "2023"): jobs_income,
-            ("Verdeling_over_groepen_Beroepsbevolking", "2023"): distribution,
+            ("Verdeling_over_groepen", "2023"): distribution,
         }
     )
 
@@ -76,7 +76,11 @@ def potential_companies_setup(request, monkeypatch, segs_capture):
         "project": {
             "verstedelijkingsscenario": "2023",
             "beprijzingsregime": regime,
-            "motieven": [motive],
+            "motief": {
+                "naam": motive,
+                "reizende populatie": "path/to/Beroepsbevolking_inkomensklasse",
+                "bestemmingsplaatsen": "path/to/Arbeidsplaatsen_inkomensklasse",
+            },
             "welke_inkomensgroepen": ["laag", "middellaag", "middelhoog", "hoog"],
             "paden": {
                 "output_directory": "out",

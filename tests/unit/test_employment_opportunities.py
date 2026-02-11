@@ -12,7 +12,6 @@ import pytest
 def employment_opportunities_setup(request, monkeypatch, segs_capture):
     """Common setup for employment opportunities tests."""
     import ikob.employment_opportunities as employment_opportunities
-    from ikob.configuration_definition import DecayCurveName, TvomType
 
     pod = "Restdag"
     motive = "werk"
@@ -84,8 +83,6 @@ def employment_opportunities_setup(request, monkeypatch, segs_capture):
                 "naam": motive,
                 "reizende populatie": "path/to/Beroepsbevolking_inkomensklasse",
                 "bestemmingsplaatsen": "path/to/Arbeidsplaatsen_inkomensklasse",
-                "TVOM": TvomType.WORK,
-                "reistijdvervalscurve": DecayCurveName.WORK_AND_SOCIAL,
             },
             "welke_inkomensgroepen": ["laag", "middellaag", "middelhoog", "hoog"],
             "paden": {
