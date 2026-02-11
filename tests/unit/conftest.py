@@ -10,7 +10,7 @@ class SegsCapture:
         self.writes_csv = []
         self.writes_xlsx = []
 
-    def read(self, id: str, type_caster=int, scenario=""):
+    def read(self, id: str, type_caster=int, scenario="", group="", modifier=""):
         key = (id, scenario)
         if key not in self.data_by_key:
             raise KeyError(f"Missing SEGS fixture for id={id!r}, scenario={scenario!r}")

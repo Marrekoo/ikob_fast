@@ -82,7 +82,7 @@ def distribute_population_over_groups(config):
     # This seems to be Table 5 of IKOB-algorithm.pdf, although this uses a flat percentage for all urbanization grades
     free_pt_percentage = verdeling_config["GratisOVpercentage"]
     motive_name = project_config["motief"]["naam"]
-    traveling_population = project_config["motief"]["reizende populatie"]
+    traveling_population_path = Path(project_config["motief"]["reizende populatie"])
 
     # Vaste waarden
     income_levels = ["laag", "middellaag", "middelhoog", "hoog"]
@@ -142,7 +142,7 @@ def distribute_population_over_groups(config):
     no_free_car = []
     no_car_with_license = []
 
-    traveling_population = segs_source.read(Path(traveling_population).name, scenario=scenario)
+    traveling_population = segs_source.read(traveling_population_path.name, scenario=scenario)
 
     citizens_totals = np.sum(traveling_population, axis=1)
 
