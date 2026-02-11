@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 
+from ikob.configuration_definition import DecayCurveName, TvomType
 from tests.unit.conftest import SegsCapture
 
 
@@ -14,6 +15,13 @@ def _minimal_config():
                 "segs_directory": "segs",
                 "output_directory": "out",
                 "skims_directory": "skims",
+            },
+            "motief": {
+                "naam": "motive",
+                "reizende populatie": "Beroepsbevolking_inkomensklasse",
+                "bestemmingsplaatsen": "path",
+                "TVOM": TvomType.WORK,
+                "reistijdvervalscurve": DecayCurveName.WORK_AND_SOCIAL,
             },
         },
         "verdeling": {
@@ -168,14 +176,16 @@ def test_distribute_over_groups_computation(zone_index, income_group, income_ind
 
     # Assert
     # distribute_over_groups should write a CSV for the computed distribution.
-    writes = [w for w in capture.writes_csv if w["id"] == "Verdeling_over_groepen"]
+    writes = [
+        w
+        for w in capture.writes_csv
+        if w["id"] == "Verdeling_over_groepen" and w["group"] == "motive" and w["modifier"] == ""
+    ]
     assert writes, "Expected distribute_over_groups to call SegsSource.write_csv"
 
-    # The main output is written for group=Beroepsbevolking, modifier="".
-    main = [w for w in writes if w["group"] == "Beroepsbevolking" and w["modifier"] == ""]
-    assert len(main) == 1
-    data = main[0]["data"]
-    header = main[0]["header"]
+    assert len(writes) == 1
+    data = writes[0]["data"]
+    header = writes[0]["header"]
 
     # 2 zones, 60 group categories. The total number of groups over which the population is distributed is 60.
     assert data.shape == (2, 60)
@@ -226,9 +236,12 @@ def test_distribution_of_income_group_is_independent_of_population_distribution(
     config = _minimal_config()
     distribute_population_over_groups(config)
 
-    writes = [w for w in capture.writes_csv if w["id"] == "Verdeling_over_groepen"]
-    main = [w for w in writes if w["group"] == "Beroepsbevolking" and w["modifier"] == ""]
-    data = main[0]["data"]
+    writes = [
+        w
+        for w in capture.writes_csv
+        if w["id"] == "Verdeling_over_groepen" and w["group"] == "motive" and w["modifier"] == ""
+    ]
+    data = writes[0]["data"]
 
     # Normalize the 'laag' income group distribution (columns 0-15) for each zone.
     laag_dist_zone0 = data[0, 0:15] / data[0, 0:15].sum()
@@ -286,9 +299,13 @@ def test_distribution_of_groups_dependent_on_car_possession_correction_factor(se
     config = _minimal_config()
     distribute_population_over_groups(config)
 
-    writes = [w for w in capture.writes_csv if w["id"] == "Verdeling_over_groepen"]
-    main = [w for w in writes if w["group"] == "Beroepsbevolking" and w["modifier"] == ""]
-    data = main[0]["data"]
+    print(capture.writes_csv)
+    writes = [
+        w
+        for w in capture.writes_csv
+        if w["id"] == "Verdeling_over_groepen" and w["group"] == "motive" and w["modifier"] == ""
+    ]
+    data = writes[0]["data"]
 
     # Normalize the 'laag' income group distribution (columns 0-15) for each zone.
     laag_dist_zone0 = data[0, 0:15] / data[0, 0:15].sum()
