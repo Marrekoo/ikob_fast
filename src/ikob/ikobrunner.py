@@ -36,9 +36,9 @@ def run_scripts(project_file, skip_steps: list[bool] | None = None, write_weight
     logger.info("Reading project file: %s.", project_file)
     config = get_config_from_args(project_file)
 
-    valid = validate.motive_file_validation(config)
+    valid = validate.FileValidator(config).validate_input_files()
     if not valid:
-        raise ValueError("Invalid motive files, see console warnings.")
+        raise ValueError("Invalid input files, see console warnings.")
 
     logger.info("Starting simulations...")
     if not skip_steps:

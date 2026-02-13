@@ -1,54 +1,170 @@
 ### Validate the template
 
 import logging
-import os
 from pathlib import Path
 
-from ikob.datasource import SegsSource
+import numpy as np
+
+from ikob import utils
+from ikob.datasource import SegsSource, SkimsSource, read_csv_from_config, read_parking_times
 
 logger = logging.getLogger(__name__)
 
 
-def validate_config_files(config, filename):
-    config["__filename__"] = os.path.splitext(os.path.basename(filename))[0]
-    valid = motive_file_validation(config)
-    if not valid:
-        logger.warning(
-            "Unable to run ikob with the current config + input directory.",
-        )
-    return valid
+class FileValidator:
+    def __init__(self, config):
+        self.config = config
+
+    def validate_input_files(self):
+        logger.info("validating input files")
+        num_zones, valid = self._skims_files_validation()
+        if valid:
+            valid &= self._motive_files_validation(num_zones)
+
+        if not valid:
+            logger.warning(
+                "Unable to run ikob with the current config + input directory.",
+            )
+        return valid
+
+    def _skims_files_validation(self):
+        part_of_day = self.config["skims"]["dagsoort"]
+
+        skims_dir = self.config["project"]["paden"]["skims_directory"]
+        skims_reader = SkimsSource(skims_dir)
+        parking_costs = self.config["geavanceerd"]["parkeerkosten"]["gebruiken"]
+
+        num_zones = -1
+
+        try:
+            parking_times_temporary = read_csv_from_config(self.config, key="skims", id="parkeerzoektijden_bestand")
+            if parking_costs:
+                parking_cost_array = read_csv_from_config(self.config, key="geavanceerd", id="parkeerkosten")
+            else:
+                parking_cost_array = utils.zeros(len(parking_times_temporary))
+            parking_times = read_parking_times(self.config)
+        except Exception as e:
+            logger.warning(
+                "A problem occurred while attempting to load the skims files: \n",
+                exc_info=e,
+            )
+            return num_zones, False
+
+        all_valid = True
+        for pod in part_of_day:
+            try:
+                car_time_matrix = skims_reader.read("Auto_Tijd", pod)
+                car_distance_matrix = skims_reader.read("Auto_Afstand", pod)
+                bike_time_matrix = skims_reader.read("Fiets_Tijd", pod)
+                bike_distance_matrix = skims_reader.read("Fiets_Afstand", pod, default=bike_time_matrix)
+                pt_time_matrix = skims_reader.read("OV_Tijd", pod)
+            except Exception as e:
+                logger.warning(
+                    "A problem occurred while attempting to load the skims files: \n",
+                    exc_info=e,
+                )
+                return num_zones, False
+
+            num_zones, valid = self._check_size_assumptions(
+                car_time_matrix,
+                car_distance_matrix,
+                bike_time_matrix,
+                bike_distance_matrix,
+                pt_time_matrix,
+                parking_cost_array,
+                parking_times,
+                old_num_zones=num_zones,
+            )
+            all_valid &= valid
+            if not valid:
+                logger.warning(f"Invalid skims files for part of day {pod}")
+
+        return num_zones, all_valid
+
+    def _check_size_assumptions(
+        self,
+        car_time_matrix: np.ndarray,
+        car_distance_matrix: np.ndarray,
+        bike_time_matrix: np.ndarray,
+        bike_distance_matrix: np.ndarray,
+        pt_time_matrix: np.ndarray,
+        parking_cost_array: np.ndarray,
+        parking_times: np.ndarray | list[list[int]],
+        old_num_zones: int,
+    ) -> tuple[int, bool]:
+        """The travel time code expects the shapes of all these matrices to be the same, and equal to the number of zones.
+
+        The arrays are expected to have this length"""
+        if not (
+            car_time_matrix.shape
+            == car_distance_matrix.shape
+            == bike_time_matrix.shape
+            == bike_distance_matrix.shape
+            == pt_time_matrix.shape
+            and pt_time_matrix.shape[0] == pt_time_matrix.shape[1]
+        ):
+            logger.warning(
+                "The travel time code expects the shapes of all skims matrices to be the same, and equal to the number of zones in both dimensions"
+            )
+            logger.warning(
+                "Shapes of the skims matrices:\n"
+                "car time matrix: {car_distance_matrix.shape}\n"
+                "car distance matrix: {car_distance_matrix.shape}\n"
+                "bike time matrix: {bike_time_matrix.shape}\n"
+                "bike distance matrix: {bike_distance_matrix.shape}\n"
+                "pt time matrix: {pt_time_matrix}"
+            )
+            return -1, False
+
+        num_zones = len(pt_time_matrix)
+        if not len(parking_cost_array) == num_zones:
+            logger.warning("The parking costs is expected to be of length equal to the number of zones")
+            return num_zones, False
+
+        if not (len(parking_times) == num_zones and len(parking_times[0]) == 3):
+            logger.warning(
+                "The parking times is expected to contain 3 values for each zone. (the zone, the arrival search time, the departure search time)"
+            )
+            return num_zones, False
+
+        if old_num_zones != -1:
+            if not num_zones == old_num_zones:
+                logger.warning("The number of zones should be constant throughout generalized travel time")
+                return num_zones, False
+
+        return num_zones, True
+
+    def _motive_files_validation(self, num_zones):
+        motive = self.config["project"]["motief"]
+        scenario = self.config["project"]["verstedelijkingsscenario"]
+
+        traveling_population_path = Path(motive["reizende populatie"])
+        destinations_path = Path(motive["bestemmingsplaatsen"])
+
+        segs_source = SegsSource(self.config)
+
+        valid = True
+        valid &= is_valid_motive_file(segs_source, traveling_population_path.name, scenario, num_zones)
+        valid &= is_valid_motive_file(segs_source, destinations_path.name, scenario, num_zones)
+        return valid
 
 
-def motive_file_validation(config):
-    motive = config["project"]["motief"]
-    scenario = config["project"]["verstedelijkingsscenario"]
-
-    traveling_population_path = Path(motive["reizende populatie"])
-    destinations_path = Path(motive["bestemmingsplaatsen"])
-
-    segs_source = SegsSource(config)
-
-    valid = True
-
+def is_valid_motive_file(segs_source: SegsSource, filename, scenario, num_zones):
     try:
-        segs_source.read(traveling_population_path.name, scenario=scenario)
+        content = segs_source.read(filename, scenario=scenario)
     except Exception as e:
         logger.warning(
-            "a problem occurred while attempting to load the motive's traveling population files: \n",
+            "A problem occurred while attempting to load the motive's traveling population files: \n",
             exc_info=e,
         )
-        valid &= False
-
-    try:
-        segs_source.read(destinations_path.name, scenario=scenario)
-    except Exception as e:
+        return False
+    expected_shape = (num_zones, 4)
+    if content.shape != expected_shape:
         logger.warning(
-            "a problem while attempting to load the motive's destination files: \n",
-            exc_info=e,
+            f"The content of {filename} should have shape {expected_shape} (#zones x #income_classes), but has shape {content.shape}"
         )
-        valid &= False
-
-    return valid
+        return False
+    return True
 
 
 def _validateDefaultType(valtype, defvalue):

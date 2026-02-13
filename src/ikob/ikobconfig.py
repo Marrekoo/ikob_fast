@@ -74,13 +74,14 @@ def load_config(filename):
                 raise ValueError(msg)
 
         config["__filename__"] = os.path.splitext(os.path.basename(filename))[0]
-        validate.validate_config_files(config, filename)
+        validate.FileValidator(config).validate_input_files()
     return config
 
 
 def saveConfig(filename, config):
     try:
-        config_is_valid = validate.validate_config_files(config, filename)
+        config["__filename__"] = os.path.splitext(os.path.basename(filename))[0]
+        config_is_valid = validate.FileValidator(config).validate_input_files()
         del config["__filename__"]
         with open(filename, "w") as json_file:
             json.dump(config, json_file, indent=2)

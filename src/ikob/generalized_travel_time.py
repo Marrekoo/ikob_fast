@@ -107,16 +107,8 @@ def generalized_travel_time(config) -> DataSource:
         )
         pt_time_matrix = skims_reader.read("OV_Tijd", pod)
 
-        num_zones = _check_size_assumptions(
-            car_time_matrix,
-            car_distance_matrix,
-            bike_time_matrix,
-            bike_distance_matrix,
-            pt_time_matrix,
-            parking_cost_array,
-            parking_times,
-            old_num_zones=num_zones,
-        )
+        # Can be any of the matrices, this is checked in validate.py
+        num_zones = len(pt_time_matrix)
 
         if pt_cost_file:
             pt_cost_matrix = skims_reader.read("OV_Kosten", pod)
@@ -235,38 +227,3 @@ def generalized_travel_time(config) -> DataSource:
             generalized_travel_time.set(key, gtr_skim.copy())
 
     return generalized_travel_time
-
-
-def _check_size_assumptions(
-    car_time_matrix: np.ndarray,
-    car_distance_matrix: np.ndarray,
-    bike_time_matrix: np.ndarray,
-    bike_distance_matrix: np.ndarray,
-    pt_time_matrix: np.ndarray,
-    parking_cost_array: np.ndarray,
-    parking_times: np.ndarray | list[list[int]],
-    old_num_zones: int | None,
-) -> int:
-    """The travel time code expects the shapes of all these matrices to be the same, and equal to the number of zones.
-
-    The arrays are expected to have this length"""
-    assert (
-        car_time_matrix.shape
-        == car_distance_matrix.shape
-        == bike_time_matrix.shape
-        == bike_distance_matrix.shape
-        == pt_time_matrix.shape
-        and pt_time_matrix.shape[0] == pt_time_matrix.shape[1]
-    ), (
-        "The travel time code expects the shapes of all these matrices to be the same, and equal to the number of zones in both dimensions"
-    )
-    num_zones = len(pt_time_matrix)
-    assert len(parking_cost_array) == num_zones, (
-        "The parking costs is expected to be of length equal to the number of zones"
-    )
-    assert len(parking_times) == num_zones and len(parking_times[0]) == 3, (
-        "The parking times is expected to contain 3 values for each zone. (the zone, the arrival search time, the departure search time)"
-    )
-    if old_num_zones is not None:
-        assert num_zones == old_num_zones, "The number of zones should be constant throughout generalized travel time"
-    return num_zones

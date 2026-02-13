@@ -5,7 +5,6 @@ import pathlib
 from dataclasses import dataclass
 from typing import Optional, Type
 
-import numpy as np
 import numpy.typing as npt
 from numpy.typing import NDArray
 
@@ -89,7 +88,7 @@ class SkimsSource:
             raise DataSourceError("Skims source initialized with empty skims dir")
         self.skims_dir = pathlib.Path(skims_dir)
 
-    def read(self, id: str, dagdeel: str, type_caster=float, default: npt.NDArray = np.array([])) -> npt.NDArray:
+    def read(self, id: str, dagdeel: str, type_caster=float, default: npt.NDArray | None = None) -> npt.NDArray:
         """Read skims from disk.
 
         Reads the skim file formed by the identifier and dagdeel.
@@ -98,6 +97,8 @@ class SkimsSource:
         path = (self.skims_dir / dagdeel / id).with_suffix(".csv")
         if os.path.exists(path):
             return utils.read_csv(path, type_caster=type_caster)
+        if default is None:
+            raise FileNotFoundError(f"Skim file {path} not found, with no default.")
         logger.warning(f"Skim file {path} not found, using default.")
         return default
 
