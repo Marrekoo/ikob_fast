@@ -18,13 +18,13 @@ def create_citizens_file(distribution_matrix, working_population):
     return citizens_file
 
 
-def potential_companies(config, single_weights: DataSource, combined_weights: DataSource) -> DataSource:
+def reachable_population(config, single_weights: DataSource, combined_weights: DataSource) -> DataSource:
     """
-    From combined weights to number of citizens that can reach employment opportunities
+    From combined weights to number of citizens that can reach the destination in a zone.
 
     Corresponds to section D5 in the IKOB-algorithm.pdf.
     """
-    logger.info("Starting step: Possibilities for companies and institutes.")
+    logger.info("Starting step: Reachable population for destinations.")
 
     project_config = config["project"]
     skims_config = config["skims"]
@@ -293,12 +293,6 @@ def potential_companies(config, single_weights: DataSource, combined_weights: Da
                         else:
                             general_matrix_product[i].append(0)
 
-                # Section D5 regional aggregation note:
-                # The PDF defines $B_{irv}$ as a jobs-weighted aggregation over destination zones in a region.
-                # Here `Pot_totaalproduct` prepares the numerator term $B_{ibv} \cdot A_{ib}$ by multiplying
-                # the destination-level reach (`general_total_transpose`) by the number of jobs/pupil-places
-                # in that destination zone (`place_of_employment_class`).
-
                 general_total_transpose = np.round(general_total_transpose).astype(int)
                 key = DataKey(
                     id="Pot_totaal",
@@ -308,6 +302,12 @@ def potential_companies(config, single_weights: DataSource, combined_weights: Da
                     modality=modality,
                 )
                 origins.write_xlsx(general_total_transpose, key, header=header)
+
+                # Section D5 regional aggregation note:
+                # The PDF defines $B_{irv}$ as a jobs-weighted aggregation over destination zones in a region.
+                # Here `Pot_totaalproduct` prepares the numerator term $B_{ibv} \cdot A_{ib}$ by multiplying
+                # the destination-level reach (`general_total_transpose`) by the number of jobs/pupil-places
+                # in that destination zone (`destinations`).
 
                 key = DataKey(
                     id="Pot_totaalproduct",

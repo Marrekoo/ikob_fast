@@ -8,6 +8,8 @@ This data is used to create accessibility profiles for several groups within soc
 Potential accessibility is calculated in analogy with [Hansen (1958)](https://www.tandfonline.com/doi/abs/10.1080/01944365908978307 "Subscription needed"). It uses distance decay curves for each mode, based on time and cost (perception) by each group in society.
 So, the further away an amenity (like a job location) is, the less it will count as a full option. The calculated potential accessibility, therefore, is a weighted amount.
 
+### Nomenclature
+
 Some commonly used abbreviations / jargon:
 - TVOM: Time value of money, how much money a unit of time is worth.  
   Used to combine both travel time and travel costs into a single metric.
@@ -16,6 +18,9 @@ Some commonly used abbreviations / jargon:
 - skims: Data to determine an impedance ('friction') matrix from zone to zone.  
   For example: A matrix of distances via car from zone to zone, costs per kilometer of traveling by car, etc.
 - GTR: Generalized travel time
+
+In the past, IKOB was focussed on commuting trips. You might see this reflected in nomenclature where terms like 'employment', 'jobs' are used to indicate the traveling population and their destinations.
+Ikob since has been generalized to allow for different motives, but you might see this remnants of this old approach. 
 
 ## Installation and usage
 

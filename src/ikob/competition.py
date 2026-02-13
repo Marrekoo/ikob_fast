@@ -9,14 +9,14 @@ from ikob.datasource import DataKey, DataSource, DataType, SegsSource
 logger = logging.getLogger(__name__)
 
 
-def compute_income_distributions(citizens_or_places_of_employment):
-    totals = [sum(row) for row in citizens_or_places_of_employment]
+def compute_income_distributions(citizens_or_destinations):
+    totals = [sum(row) for row in citizens_or_destinations]
 
-    income_distributions = np.zeros((len(citizens_or_places_of_employment), len(citizens_or_places_of_employment[0])))
-    for i in range(len(citizens_or_places_of_employment)):
-        for j in range(len(citizens_or_places_of_employment[0])):
+    income_distributions = np.zeros((len(citizens_or_destinations), len(citizens_or_destinations[0])))
+    for i in range(len(citizens_or_destinations)):
+        for j in range(len(citizens_or_destinations[0])):
             if totals[i] > 0:
-                income_distributions[i][j] = citizens_or_places_of_employment[i][j] / totals[i]
+                income_distributions[i][j] = citizens_or_destinations[i][j] / totals[i]
 
     return income_distributions
 
@@ -101,18 +101,18 @@ def get_weight_matrix(
     return combined_weights.get(key)
 
 
-def competition_on_jobs(
+def competition_on_destinations(
     config, single_weights: DataSource, combined_weights: DataSource, origins: DataSource
 ) -> DataSource:
     """
-    For every zone it's determined if the zone has a (dis)advantage compared to other zones in reaching employment opportunities.
+    For every zone it's determined if the zone has a (dis)advantage compared to other zones in reaching destinations.
 
     Corresponds to section D6 in the IKOB-algorithm.pdf.
 
     D6 defines a competition factor residents that discounts
     destinations with many competing residents.
     """
-    logger.info("Starting step: Compute competition on jobs")
+    logger.info("Starting step: Compute competition on destinations")
     return competition(config, single_weights, combined_weights, origins, citizens=False)
 
 
@@ -120,7 +120,7 @@ def competition_on_citizens(
     config, single_weights: DataSource, combined_weights: DataSource, origins: DataSource
 ) -> DataSource:
     """
-    For every zone with employment opportunities it's determined if the zone has a (dis)advantage compared to other zones in attracting citizens.
+    For every zone it's determined if the zone has a (dis)advantage compared to other zones in attracting citizens.
 
     Corresponds to section D7 in the IKOB-algorithm.pdf.
 
@@ -137,7 +137,7 @@ def competition(
     if citizens:
         msg = "Competition for citizens."
     else:
-        msg = "Competition for places of employment."
+        msg = "Competition for destinations."
     logger.info(msg)
 
     project_config = config["project"]
@@ -232,9 +232,9 @@ def competition(
     competitions = DataSource(config, DataType.COMPETITION)
 
     if citizens:
-        citizens_or_places_of_employment = traveling_population
+        citizens_or_destinations = traveling_population
     else:
-        citizens_or_places_of_employment = destinations
+        citizens_or_destinations = destinations
 
     for car_possession_group in car_possession_groups:
         distribution_matrix = segs_source.read(
@@ -261,12 +261,12 @@ def competition(
                     reach = origins.get(key)
 
                     # Section D6/D7: `reach` is the previously computed reachability used as denominator.
-                    # - citizens=False (D6 / competition_on_jobs): `reach` comes from D5 / potential_companies and is destination-side potential (how many
+                    # - citizens=False (D6 / competition_on_destinations): `reach` comes from D5 / reachable_population and is destination-side potential (how many
                     #   residents can reach each destination zone).
-                    # - citizens=True  (D7 / competition_on_citizens): `reach` comes from D4 / employment_opportunities and is origin-side reachable opportunities
+                    # - citizens=True  (D7 / competition_on_citizens): `reach` comes from D4 / reachable_destinations and is origin-side reachable opportunities
                     #   (how many jobs/places residents in an origin zone can reach).
 
-                    competition_total = np.zeros(len(citizens_or_places_of_employment))
+                    competition_total = np.zeros(len(citizens_or_destinations))
 
                     for i_group, group in enumerate(groups):
                         distribution = distribution_matrix[:, i_group]
@@ -289,12 +289,12 @@ def competition(
 
                             # Section D6/D7 competition term:
                             # Compute a scarcity/competition ratio per zone and propagate it through the origin-destination weights.
-                            # - citizens=False (D6 / competition_on_jobs): `citizens_or_places_of_employment` is $A_{ib}$ (jobs/places per
+                            # - citizens=False (D6 / competition_on_destinations): `citizens_or_destinations` is $A_{ib}$ (jobs/places per
                             #   destination). Dividing by `reach` discounts destinations with many competing residents.
-                            # - citizens=True  (D7 / competition_on_citizens): `citizens_or_places_of_employment` is $I_{ih}$ (residents per
+                            # - citizens=True  (D7 / competition_on_citizens): `citizens_or_destinations` is $I_{ih}$ (residents per
                             #   origin). Dividing by `reach` discounts origins with many reachable opportunities.
                             competition = matrix @ (
-                                citizens_or_places_of_employment.T[i_income_group] / np.where(reach > 0, reach, 1.0)
+                                citizens_or_destinations.T[i_income_group] / np.where(reach > 0, reach, 1.0)
                             )
 
                             # aggregation to income-class level:
@@ -343,14 +343,14 @@ def competition(
                     general_matrix.append(competitions.get(key))
                 general_totals_transpose = utils.transpose(general_matrix)
 
-                for i in range(len(citizens_or_places_of_employment)):
+                for i in range(len(citizens_or_destinations)):
                     general_matrix_product.append([])
-                    for j in range(len(citizens_or_places_of_employment[0])):
+                    for j in range(len(citizens_or_destinations[0])):
                         if (citizens and (destinations[i][j] > 0)) or (
                             (not citizens) and (traveling_population[i, j] > 0)
                         ):
                             general_matrix_product[i].append(
-                                general_totals_transpose[i][j] * citizens_or_places_of_employment[i][j]
+                                general_totals_transpose[i][j] * citizens_or_destinations[i][j]
                             )
                         else:
                             general_matrix_product[i].append(0)

@@ -220,7 +220,7 @@ def test_competition_on_jobs_per_capita_sensitivity(
     }
 
     # Act
-    competitions = comp.competition_on_jobs(config, _Weights(), _Weights(), _Origins())  # type: ignore
+    competitions = comp.competition_on_destinations(config, _Weights(), _Weights(), _Origins())  # type: ignore
 
     # Assert
     key = DataKey(

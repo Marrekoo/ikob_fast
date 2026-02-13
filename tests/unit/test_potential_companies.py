@@ -11,7 +11,7 @@ import pytest
 )
 def potential_companies_setup(request, monkeypatch, segs_capture):
     """Common setup for potential companies tests."""
-    import ikob.potential_companies as pc
+    import ikob.reachable_population as pc
 
     pod = "Restdag"
     motive = "werk"
@@ -93,7 +93,7 @@ def potential_companies_setup(request, monkeypatch, segs_capture):
         "geavanceerd": {"welke_groepen": ["alle groepen"]},
     }
 
-    origins = pc.potential_companies(config, _Weights(), _Weights())  # type: ignore
+    origins = pc.reachable_population(config, _Weights(), _Weights())  # type: ignore
 
     return {
         "origins": origins,
