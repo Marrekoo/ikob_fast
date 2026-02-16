@@ -8,7 +8,7 @@ def work_constants(modality, preference, decay_curve_name: DecayCurveName):
         return _work_constants(modality, preference)
     elif decay_curve_name == DecayCurveName.DAILY_SHOPPING_AND_HEALTH:
         return _daily_shopping_constants(modality, preference)
-    elif decay_curve_name == DecayCurveName.DAILY_SHOPPING_AND_HEALTH:
+    elif decay_curve_name == DecayCurveName.NON_DAILY_SHOPPING_AND_EDUCATION:
         return _non_daily_shopping_constants(modality, preference)
     else:
         raise ValueError(f"Unknown decay_curve_name: '{decay_curve_name}'")
