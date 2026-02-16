@@ -109,11 +109,11 @@ class FileValidator:
             )
             logger.warning(
                 "Shapes of the skims matrices:\n"
-                "car time matrix: {car_distance_matrix.shape}\n"
-                "car distance matrix: {car_distance_matrix.shape}\n"
-                "bike time matrix: {bike_time_matrix.shape}\n"
-                "bike distance matrix: {bike_distance_matrix.shape}\n"
-                "pt time matrix: {pt_time_matrix}"
+                f"car time matrix: {car_distance_matrix.shape}\n"
+                f"car distance matrix: {car_distance_matrix.shape}\n"
+                f"bike time matrix: {bike_time_matrix.shape}\n"
+                f"bike distance matrix: {bike_distance_matrix.shape}\n"
+                f"pt time matrix: {pt_time_matrix}"
             )
             return -1, False
 
