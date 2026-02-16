@@ -92,7 +92,7 @@ def calculate_combined_weights(config, single_weights: DataSource) -> DataSource
                         )
                         pt_matrix = single_weights.get(key)
 
-                        max = np.maximum.reduce((bike_matrix, pt_matrix))
+                        max_matrix = np.maximum.reduce((bike_matrix, pt_matrix))
                         key = DataKey(
                             f"{pt_kind}_{modality_bike}_vk",
                             part_of_day=part_of_day,
@@ -103,7 +103,7 @@ def calculate_combined_weights(config, single_weights: DataSource) -> DataSource
                             subtopic="combinaties",
                         )
                         # Max weight of taking either pt or the bike
-                        combined_weights.set(key, max.copy())
+                        combined_weights.set(key, max_matrix.copy())
 
                     for car_kind in car_kinds:
                         if not has_preference(car_kind, "OV", preference):
@@ -133,7 +133,7 @@ def calculate_combined_weights(config, single_weights: DataSource) -> DataSource
                                 )
                                 car_matrix = single_weights.get(key)
 
-                                max = np.maximum.reduce((bike_matrix, car_matrix))
+                                max_matrix = np.maximum.reduce((bike_matrix, car_matrix))
                                 key = DataKey(
                                     f"{car_kind}_{modality_bike}_vk",
                                     part_of_day=part_of_day,
@@ -145,7 +145,7 @@ def calculate_combined_weights(config, single_weights: DataSource) -> DataSource
                                     fuel_kind=fuel_kind,
                                 )
                                 # Max weight of taking either the car or the bike
-                                combined_weights.set(key, max.copy())
+                                combined_weights.set(key, max_matrix.copy())
                         else:
                             key = DataKey(
                                 f"{car_kind}_vk",
@@ -157,7 +157,7 @@ def calculate_combined_weights(config, single_weights: DataSource) -> DataSource
                             )
                             car_matrix = single_weights.get(key)
 
-                            max = np.maximum.reduce((bike_matrix, car_matrix))
+                            max_matrix = np.maximum.reduce((bike_matrix, car_matrix))
                             key = DataKey(
                                 f"{car_kind}_{modality_bike}_vk",
                                 part_of_day=part_of_day,
@@ -168,7 +168,7 @@ def calculate_combined_weights(config, single_weights: DataSource) -> DataSource
                                 subtopic="combinaties",
                             )
                             # Max weight of taking either the car or the bike
-                            combined_weights.set(key, max.copy())
+                            combined_weights.set(key, max_matrix.copy())
 
                 for pt_kind in pt_kinds:
                     for car_kind in car_kinds:
@@ -197,7 +197,7 @@ def calculate_combined_weights(config, single_weights: DataSource) -> DataSource
                                     fuel_kind=fuel_kind,
                                 )
                                 car_matrix = single_weights.get(key)
-                                max = np.maximum.reduce((pt_matrix, car_matrix))
+                                max_matrix = np.maximum.reduce((pt_matrix, car_matrix))
                                 key = DataKey(
                                     f"{car_kind}_{pt_kind}_vk",
                                     part_of_day=part_of_day,
@@ -209,7 +209,7 @@ def calculate_combined_weights(config, single_weights: DataSource) -> DataSource
                                     fuel_kind=fuel_kind,
                                 )
                                 # Max weight of taking either the car or pt
-                                combined_weights.set(key, max.copy())
+                                combined_weights.set(key, max_matrix.copy())
                         else:
                             key = DataKey(
                                 f"{car_kind}_vk",
@@ -221,7 +221,7 @@ def calculate_combined_weights(config, single_weights: DataSource) -> DataSource
                             )
                             car_matrix = single_weights.get(key)
 
-                            max = np.maximum.reduce((pt_matrix, car_matrix))
+                            max_matrix = np.maximum.reduce((pt_matrix, car_matrix))
                             key = DataKey(
                                 f"{car_kind}_{pt_kind}_vk",
                                 part_of_day=part_of_day,
@@ -232,7 +232,7 @@ def calculate_combined_weights(config, single_weights: DataSource) -> DataSource
                                 subtopic="combinaties",
                             )
                             # Max weight of taking either the car or pt
-                            combined_weights.set(key, max.copy())
+                            combined_weights.set(key, max_matrix.copy())
 
                 for modality_bike in modalities_bike:
                     for pt_kind in pt_kinds:
@@ -274,7 +274,7 @@ def calculate_combined_weights(config, single_weights: DataSource) -> DataSource
                                     )
                                     car_matrix = single_weights.get(key)
 
-                                    max = np.maximum.reduce((car_matrix, bike_matrix, pt_matrix))
+                                    max_matrix = np.maximum.reduce((car_matrix, bike_matrix, pt_matrix))
                                     key = DataKey(
                                         f"{car_kind}_{pt_kind}_{modality_bike}_vk",
                                         part_of_day=part_of_day,
@@ -286,7 +286,7 @@ def calculate_combined_weights(config, single_weights: DataSource) -> DataSource
                                         fuel_kind=fuel_kind,
                                     )
                                     # Max weight of taking either the car or pt or the bike
-                                    combined_weights.set(key, max.copy())
+                                    combined_weights.set(key, max_matrix.copy())
                             else:
                                 key = DataKey(
                                     f"{car_kind}_vk",
@@ -298,7 +298,7 @@ def calculate_combined_weights(config, single_weights: DataSource) -> DataSource
                                 )
                                 car_matrix = single_weights.get(key)
 
-                                max = np.maximum.reduce((car_matrix, bike_matrix, pt_matrix))
+                                max_matrix = np.maximum.reduce((car_matrix, bike_matrix, pt_matrix))
                                 key = DataKey(
                                     f"{car_kind}_{pt_kind}_{modality_bike}_vk",
                                     part_of_day=part_of_day,
@@ -309,6 +309,6 @@ def calculate_combined_weights(config, single_weights: DataSource) -> DataSource
                                     subtopic="combinaties",
                                 )
                                 # Max weight of taking either the car or pt or the bike
-                                combined_weights.set(key, max.copy())
+                                combined_weights.set(key, max_matrix.copy())
 
     return combined_weights
