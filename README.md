@@ -176,3 +176,8 @@ These detect when output has changed but don't verify expected behavior.
 
 To generate new reference data for these tests it's easiest to just run the test without deleting the computed results at the end. In general this boils down to removing the `remove_directory` call. If the test uses a [temporary test directory](https://docs.pytest.org/en/6.2.x/tmpdir.html#the-tmpdir-fixture) or something similar, it's easiest to make that a concrete path and get the results from there. 
 
+# Motieven 
+
+A run of ikob is always for a specific travel motive. In the project config you can configure the name of the motive, the corresponding traveling population and the destinations corresponding to the travel motive. In addition, it's also possible to configure the time value of money used for the motive, and the travel time decay curve to use.
+
+When you run ikob for multiple different motives in sequence, the results are separated in the results directory (generally by a subdirectory with the motive name). 
