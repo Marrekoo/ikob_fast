@@ -14,7 +14,7 @@ def employment_opportunities_setup(request, monkeypatch, segs_capture):
     import ikob.reachable_destinations as reachable_destinations
 
     pod = "Restdag"
-    motive = "werk"
+    motive = "werk or something else"
     regime = "Basis"
 
     # Working population size should not matter for total employment opportunities.

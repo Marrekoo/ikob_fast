@@ -50,7 +50,7 @@ def test_combined_modalities_use_elementwise_max(modality_key, modalities, prefe
 
     # Prepare
     pod = "Restdag"
-    motive = "werk"
+    motive = "werk or something else"
     regime = "Basis"
 
     bike = np.array([[1.0, 0.0, 0.5], [0.0, 0.0, 0.2], [0.3, 0.1, 0.4]])

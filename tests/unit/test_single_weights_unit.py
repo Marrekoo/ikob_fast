@@ -40,7 +40,7 @@ def test_calculate_single_weights_writes_expected_keys():
 
     # Prepare
     pod = "Restdag"
-    motive = "werk"
+    motive = "werk or something else"
     regime = "Basis"
 
     constant_gtt = np.array([[10.0, 20.0], [30.0, 40.0]])

@@ -14,7 +14,7 @@ def potential_companies_setup(request, monkeypatch, segs_capture):
     import ikob.reachable_population as pc
 
     pod = "Restdag"
-    motive = "werk"
+    motive = "werk or something else"
     regime = "Basis"
 
     # Job counts should not matter for total potential companies (citizens reaching destinations).

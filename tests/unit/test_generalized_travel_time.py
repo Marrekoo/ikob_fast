@@ -37,7 +37,7 @@ def setup_generalized_travel_time_input(monkeypatch, gtt):
     from ikob.configuration_definition import DecayCurveName, TvomType
 
     pod = "Restdag"
-    motive = "werk"
+    motive = "werk or something else"
     regime = "Basis"
     income = "laag"
 
@@ -84,6 +84,7 @@ def setup_generalized_travel_time_input(monkeypatch, gtt):
     monkeypatch.setattr(gtt, "read_parking_times", lambda _config: parking_times)
     monkeypatch.setattr(gtt, "read_csv_from_config", fake_read_csv_from_config)
 
+    tvom = TvomType.WORK
     config = {
         "__filename__": "pytest",
         "project": {
@@ -93,7 +94,7 @@ def setup_generalized_travel_time_input(monkeypatch, gtt):
                 "naam": motive,
                 "reizende populatie": "path",
                 "bestemmingsplaatsen": "path",
-                "TVOM": TvomType.WORK,
+                "TVOM": tvom,
                 "reistijdvervalscurve": DecayCurveName.WORK_AND_SOCIAL,
             },
             "paden": {
@@ -140,6 +141,7 @@ def setup_generalized_travel_time_input(monkeypatch, gtt):
         pt_time,
         pt_dist,
         parking_times,
+        tvom,
     )
 
 
@@ -147,8 +149,8 @@ def test_generalized_travel_time_fiets(monkeypatch):
     import ikob.generalized_travel_time as gtt
     from ikob.datasource import DataKey
 
-    config, pod, regime, motive, income, _, _, bike_time, bike_distance, _, _, _ = setup_generalized_travel_time_input(
-        monkeypatch, gtt
+    config, pod, regime, motive, income, _, _, bike_time, bike_distance, _, _, _, tvom = (
+        setup_generalized_travel_time_input(monkeypatch, gtt)
     )
 
     datasource = gtt.generalized_travel_time(config)
@@ -156,7 +158,7 @@ def test_generalized_travel_time_fiets(monkeypatch):
     fiets_key = DataKey(id="Fiets", part_of_day=pod, regime=regime, motive=motive, income=income)
     fiets = datasource.get(fiets_key)
     expected_fiets = (
-        bike_time + config["TVOM"][motive][income] * bike_distance * config["skims"]["bike_cost_ct_per_km"] / 100
+        bike_time + config["TVOM"][tvom][income] * bike_distance * config["skims"]["bike_cost_ct_per_km"] / 100
     )
     np.testing.assert_allclose(fiets, expected_fiets)
 
@@ -166,7 +168,7 @@ def test_generalized_travel_time_public_transport(monkeypatch):
     from ikob.datasource import DataKey
     from ikob.generalized_travel_time import costs_public_transport
 
-    config, pod, regime, motive, income, _, _, _, _, pt_time, pt_dist, _ = setup_generalized_travel_time_input(
+    config, pod, regime, motive, income, _, _, _, _, pt_time, pt_dist, _, tvom = setup_generalized_travel_time_input(
         monkeypatch, gtt
     )
 
@@ -176,7 +178,7 @@ def test_generalized_travel_time_public_transport(monkeypatch):
     pt = datasource.get(pt_key)
     expected_pt = np.array(
         pt_time
-        + config["TVOM"][motive][income]
+        + config["TVOM"][tvom][income]
         * costs_public_transport(
             distance=pt_dist,
             # The config is is in cents, but the function expects euros.
@@ -195,7 +197,7 @@ def test_generalized_travel_time_free_public_transport(monkeypatch):
     import ikob.generalized_travel_time as gtt
     from ikob.datasource import DataKey
 
-    config, pod, regime, motive, _, _, _, _, _, pt_time, _, _ = setup_generalized_travel_time_input(monkeypatch, gtt)
+    config, pod, regime, motive, _, _, _, _, _, pt_time, _, _, _ = setup_generalized_travel_time_input(monkeypatch, gtt)
 
     datasource = gtt.generalized_travel_time(config)
 
@@ -209,7 +211,7 @@ def test_generalized_travel_time_auto_fossiel(monkeypatch):
     import ikob.generalized_travel_time as gtt
     from ikob.datasource import DataKey
 
-    config, pod, regime, motive, income, car_time, car_dist, _, _, _, _, parking_times = (
+    config, pod, regime, motive, income, car_time, car_dist, _, _, _, _, parking_times, tvom = (
         setup_generalized_travel_time_input(monkeypatch, gtt)
     )
 
@@ -219,7 +221,7 @@ def test_generalized_travel_time_auto_fossiel(monkeypatch):
     auto = datasource.get(auto_key)
     # total_time = car_time + parking_arrival(origin) + parking_departure(dest)
     total_time = car_time + parking_times[:, [1]] + parking_times[[0, 1, 2], [2]]
-    expected_auto = total_time + config["TVOM"][motive][income] * car_dist * (
+    expected_auto = total_time + config["TVOM"][tvom][income] * car_dist * (
         config["skims"]["Kosten auto fossiele brandstof"]["variabele kosten"] / 100
         + config["skims"]["Kosten auto fossiele brandstof"]["kmheffing"] / 100
     )
@@ -230,7 +232,7 @@ def test_generalized_travel_time_geen_auto(monkeypatch):
     import ikob.generalized_travel_time as gtt
     from ikob.datasource import DataKey
 
-    config, pod, regime, motive, income, car_time, car_dist, _, _, _, _, _ = setup_generalized_travel_time_input(
+    config, pod, regime, motive, income, car_time, car_dist, _, _, _, _, _, tvom = setup_generalized_travel_time_input(
         monkeypatch, gtt
     )
 
@@ -239,7 +241,7 @@ def test_generalized_travel_time_geen_auto(monkeypatch):
     no_car_key = DataKey(id="GeenAuto", part_of_day=pod, income=income, motive=motive, regime=regime)
     no_car = datasource.get(no_car_key)
     # total_cost = time * tijdkost + distance * (varkost + kmheffing)
-    expected_no_car = car_time + config["TVOM"][motive][income] * (
+    expected_no_car = car_time + config["TVOM"][tvom][income] * (
         car_time * config["skims"]["tijdkostenga"]["GeenAuto"]
         + car_dist
         * (
@@ -254,7 +256,7 @@ def test_generalized_travel_time_geen_rijbewijs(monkeypatch):
     import ikob.generalized_travel_time as gtt
     from ikob.datasource import DataKey
 
-    config, pod, regime, motive, income, car_time, car_dist, _, _, _, _, _ = setup_generalized_travel_time_input(
+    config, pod, regime, motive, income, car_time, car_dist, _, _, _, _, _, tvom = setup_generalized_travel_time_input(
         monkeypatch, gtt
     )
 
@@ -262,7 +264,7 @@ def test_generalized_travel_time_geen_rijbewijs(monkeypatch):
 
     no_license_key = DataKey(id="GeenRijbewijs", part_of_day=pod, income=income, motive=motive, regime=regime)
     no_license = datasource.get(no_license_key)
-    expected_no_license = car_time + config["TVOM"][motive][income] * (
+    expected_no_license = car_time + config["TVOM"][tvom][income] * (
         car_time * config["skims"]["tijdkostenga"]["GeenRijbewijs"]
         + car_dist
         * (
@@ -277,7 +279,7 @@ def test_generalized_travel_time_includes_additional_and_parking_costs(monkeypat
     import ikob.generalized_travel_time as gtt
     from ikob.datasource import DataKey
 
-    config, pod, regime, motive, income, car_time, car_dist, _, _, _, _, parking_times = (
+    config, pod, regime, motive, income, car_time, car_dist, _, _, _, _, parking_times, tvom = (
         setup_generalized_travel_time_input(monkeypatch, gtt)
     )
 
@@ -308,7 +310,7 @@ def test_generalized_travel_time_includes_additional_and_parking_costs(monkeypat
         car_time[0][1]
         + parking_times[0][1]
         + parking_times[1][2]
-        + config["TVOM"][motive][income]
+        + config["TVOM"][tvom][income]
         * (
             car_dist[0][1]
             * (
