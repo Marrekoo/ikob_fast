@@ -22,6 +22,7 @@ class FileValidator:
             valid &= self._motive_files_validation(num_zones)
 
         if not valid:
+            # This is only an error when we are trying to run ikob right now when loading / saving config a warning is good.
             logger.warning(
                 "Unable to run ikob with the current config + input directory.",
             )
@@ -92,9 +93,9 @@ class FileValidator:
         parking_times: np.ndarray | list[list[int]],
         old_num_zones: int,
     ) -> tuple[int, bool]:
-        """The travel time code expects the shapes of all these matrices to be the same, and equal to the number of zones.
+        """The shapes of all skims matrices should be the same, and equal to the number of zones in both dimensions
 
-        The arrays are expected to have this length"""
+        The skims arrays are expected to have the number of zones as length"""
         if not (
             car_time_matrix.shape
             == car_distance_matrix.shape
@@ -104,7 +105,7 @@ class FileValidator:
             and pt_time_matrix.shape[0] == pt_time_matrix.shape[1]
         ):
             logger.warning(
-                "The travel time code expects the shapes of all skims matrices to be the same, and equal to the number of zones in both dimensions"
+                "The shapes of all skims matrices should be the same, and equal to the number of zones in both dimensions"
             )
             logger.warning(
                 "Shapes of the skims matrices:\n"
@@ -118,18 +119,19 @@ class FileValidator:
 
         num_zones = len(pt_time_matrix)
         if not len(parking_cost_array) == num_zones:
-            logger.warning("The parking costs is expected to be of length equal to the number of zones")
+            logger.warning(f"The parking costs is expected to be of length equal to the number of zones, {num_zones}")
             return num_zones, False
 
         if not (len(parking_times) == num_zones and len(parking_times[0]) == 3):
             logger.warning(
-                "The parking times is expected to contain 3 values for each zone. (the zone, the arrival search time, the departure search time)"
+                "The parking times array is expected to contain 3 values for each zone (the zone, the arrival search time, the departure search time). "
+                f"The expected shape is (shape {(num_zones, 3)}), but found shape ({len(parking_times)}, {len(parking_times[0])})"
             )
             return num_zones, False
 
         if old_num_zones != -1:
             if not num_zones == old_num_zones:
-                logger.warning("The number of zones should be constant throughout generalized travel time")
+                logger.warning("The number of zones should be the same for different parts of the day")
                 return num_zones, False
 
         return num_zones, True
@@ -144,27 +146,26 @@ class FileValidator:
         segs_source = SegsSource(self.config)
 
         valid = True
-        valid &= is_valid_motive_file(segs_source, traveling_population_path.name, scenario, num_zones)
-        valid &= is_valid_motive_file(segs_source, destinations_path.name, scenario, num_zones)
+        valid &= self._is_valid_motive_file(segs_source, traveling_population_path.name, scenario, num_zones)
+        valid &= self._is_valid_motive_file(segs_source, destinations_path.name, scenario, num_zones)
         return valid
 
-
-def is_valid_motive_file(segs_source: SegsSource, filename, scenario, num_zones):
-    try:
-        content = segs_source.read(filename, scenario=scenario)
-    except Exception as e:
-        logger.warning(
-            "A problem occurred while attempting to load the motive's traveling population files: \n",
-            exc_info=e,
-        )
-        return False
-    expected_shape = (num_zones, 4)
-    if content.shape != expected_shape:
-        logger.warning(
-            f"The content of {filename} should have shape {expected_shape} (#zones x #income_classes), but has shape {content.shape}"
-        )
-        return False
-    return True
+    def _is_valid_motive_file(self, segs_source: SegsSource, filename, scenario, num_zones):
+        try:
+            content = segs_source.read(filename, scenario=scenario)
+        except Exception as e:
+            logger.warning(
+                "A problem occurred while attempting to load the motive's traveling population files: \n",
+                exc_info=e,
+            )
+            return False
+        expected_shape = (num_zones, 4)
+        if content.shape != expected_shape:
+            logger.warning(
+                f"The content of {filename} should have shape {expected_shape} (#zones x #income_classes), but has shape {content.shape}"
+            )
+            return False
+        return True
 
 
 def _validateDefaultType(valtype, defvalue):
