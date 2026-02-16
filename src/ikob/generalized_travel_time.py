@@ -202,24 +202,23 @@ def generalized_travel_time(config) -> DataSource:
                 generalized_travel_time.set(key, gtr_skim.copy())
 
             # Free car (no variable costs compared to car) generalized travel time:
-            for income_level in income_levels:
-                gtr_skim.fill(0)
-                factor = tvom.get(income_level)
-                for i in range(num_zones):
-                    for j in range(num_zones):
-                        total_time = car_time_matrix[i][j] + parking_times[i][1] + parking_times[j][2]
-                        if additional_costs:
-                            gtr_skim[i][j] = total_time + factor * (
-                                car_distance_matrix[i][j] * road_pricing_electric
-                                + additional_cost_matrix[i][j] / 100
-                                + parking_cost_array[j] / 100
-                            )
-                        else:
-                            gtr_skim[i][j] = total_time + factor * (
-                                car_distance_matrix[i][j] * road_pricing_electric + parking_cost_array[j] / 100
-                            )
-                key = DataKey(id="GratisAuto", part_of_day=pod, income=income_level, motive=motive_name, regime=regime)
-                generalized_travel_time.set(key, gtr_skim.copy())
+            gtr_skim.fill(0)
+            factor = tvom.get(income_level)
+            for i in range(num_zones):
+                for j in range(num_zones):
+                    total_time = car_time_matrix[i][j] + parking_times[i][1] + parking_times[j][2]
+                    if additional_costs:
+                        gtr_skim[i][j] = total_time + factor * (
+                            car_distance_matrix[i][j] * road_pricing_electric
+                            + additional_cost_matrix[i][j] / 100
+                            + parking_cost_array[j] / 100
+                        )
+                    else:
+                        gtr_skim[i][j] = total_time + factor * (
+                            car_distance_matrix[i][j] * road_pricing_electric + parking_cost_array[j] / 100
+                        )
+            key = DataKey(id="GratisAuto", part_of_day=pod, income=income_level, motive=motive_name, regime=regime)
+            generalized_travel_time.set(key, gtr_skim.copy())
 
             # Free PT generalized travel time:
             gtr_skim = np.where(pt_time_matrix > 0.5, pt_time_matrix, 9999)
