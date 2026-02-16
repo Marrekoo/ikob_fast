@@ -68,33 +68,8 @@ def reachable_population(config, single_weights: DataSource, combined_weights: D
     modalities = ["Fiets", "Auto", "OV", "Auto_Fiets", "OV_Fiets", "Auto_OV", "Auto_OV_Fiets"]
 
     income_groups = ["laag", "middellaag", "middelhoog", "hoog"]
-    headstring = [
-        "Fiets",
-        "EFiets",
-        "Auto",
-        "OV",
-        "Auto_Fiets",
-        "OV_Fiets",
-        "Auto_EFiets",
-        "OV_EFiets",
-        "Auto_OV",
-        "Auto_OV_Fiets",
-        "Auto_OV_EFiets",
-    ]
-    headstringExcel = [
-        "Zone",
-        "Fiets",
-        "EFiets",
-        "Auto",
-        "OV",
-        "Auto_Fiets",
-        "OV_Fiets",
-        "Auto_EFiets",
-        "OV_EFiets",
-        "Auto_OV",
-        "Auto_OV_Fiets",
-        "Auto_OV_EFiets",
-    ]
+    headstring = modalities
+    headstringExcel = ["Zone", *modalities]
 
     segs_source = SegsSource(config)
 
