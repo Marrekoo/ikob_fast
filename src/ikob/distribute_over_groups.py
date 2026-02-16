@@ -5,6 +5,7 @@ import numpy as np
 import numpy.typing as npt
 
 from ikob.datasource import SegsSource, read_csv_from_config
+from ikob.utils import CsvIndex
 
 logger = logging.getLogger(__name__)
 
@@ -252,7 +253,12 @@ def distribute_population_over_groups(config):
 
         logger.debug("Total car possessions: %s", total_car_possession_survey)
         segs_source.write_csv(
-            total_survey, "Verdeling_over_groepen", group=population_share, scenario=scenario, header=header
+            total_survey,
+            "Verdeling_over_groepen",
+            group=population_share,
+            scenario=scenario,
+            header=header,
+            index=CsvIndex.zone_index(len(total_survey)),
         )
         segs_source.write_csv(
             survey_per_income_class,
@@ -261,4 +267,5 @@ def distribute_population_over_groups(config):
             modifier="alleen_autobezit",
             scenario=scenario,
             header=header,
+            index=CsvIndex.zone_index(len(total_survey)),
         )

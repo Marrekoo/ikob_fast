@@ -3,8 +3,8 @@ import logging
 import os
 import pathlib
 import shutil
-from dataclasses import dataclass
-from typing import Optional, Type
+from dataclasses import dataclass, field
+from typing import Type
 
 import numpy as np
 import numpy.typing as npt
@@ -154,9 +154,11 @@ class SegsSource:
                 f"File SEGS file '{path}' not found. Is the scenario (used as subfolder) '{scenario}' correct?"
             )
 
-    def write_csv(self, data, id, header, group="", jaar="", modifier="", scenario=""):
+    def write_csv(
+        self, data, id, header, group="", jaar="", modifier="", scenario="", index: utils.CsvIndex = utils.CsvIndex()
+    ):
         path = self._segs_output_dir(id, jaar, scenario, group, modifier).with_suffix(".csv")
-        return utils.write_csv(data, path, header=header)
+        return utils.write_csv(data, path, header=header, index=index)
 
 
 class DataType(enum.Enum):
@@ -175,19 +177,32 @@ class DataKey:
     A DataKey instance is constructed with a subset of the required
     strings and can be passed towards the DataSource to read/write
     the desired data.
+
+    The header and index fields are used only when writing data and are used to add semantic information to the data written
     """
 
     id: str
     part_of_day: str
-    regime: Optional[str] = ""
-    subtopic: Optional[str] = ""
-    preference: Optional[str] = ""
-    income: Optional[str] = ""
-    hub_name: Optional[str] = ""
-    motive: Optional[str] = ""
-    group: Optional[str] = ""
-    modality: Optional[str] = ""
-    fuel_kind: Optional[str] = ""
+    regime: str = ""
+    subtopic: str = ""
+    preference: str = ""
+    income: str = ""
+    hub_name: str = ""
+    motive: str = ""
+    group: str = ""
+    modality: str = ""
+    fuel_kind: str = ""
+
+    header: list[str] = field(default_factory=list, compare=False)
+    index: utils.CsvIndex = field(default_factory=utils.CsvIndex, compare=False)
+
+    @staticmethod
+    def zone_header(num_zones):
+        return ["zone_" + str(i) for i in range(num_zones)]
+
+    @staticmethod
+    def zone_index(num_zones):
+        return utils.CsvIndex.zone_index(num_zones)
 
 
 class DataSource:
@@ -261,7 +276,9 @@ class DataSource:
     def write_csv(self, data, key: DataKey, header=[]):
         assert isinstance(key, DataKey)
         path = self._make_file_path(key).with_suffix(".csv")
-        return utils.write_csv(data, path, header=header)
+        if not header:
+            header = key.header
+        return utils.write_csv(data, path, header=header, index=key.index)
 
     @staticmethod
     def write_output_md(config):

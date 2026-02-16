@@ -1,4 +1,5 @@
 import pathlib
+from dataclasses import dataclass, field
 
 import numpy as np
 
@@ -32,7 +33,17 @@ def read_csv_float(filenaam):
     return read_csv(filenaam, type_caster=float)
 
 
-def write_csv(matrix, filenaam, header=[]):
+@dataclass
+class CsvIndex:
+    name: str = ""
+    values: list[int] = field(default_factory=list)
+
+    @classmethod
+    def zone_index(cls, num_zones):
+        return cls("zone", list(range(num_zones)))
+
+
+def write_csv(matrix, filenaam, index=CsvIndex(), header=[]):
     if not isinstance(filenaam, pathlib.Path):
         filenaam = pathlib.Path(filenaam)
 
@@ -42,7 +53,19 @@ def write_csv(matrix, filenaam, header=[]):
         # np.savetxt writes this by default as one column.
         matrix = matrix.reshape(1, matrix.shape[0])
 
-    fmt = "%d" if np.isdtype(matrix.dtype, "integral") else "%.18e"
+    # Determine format for data
+    data_fmt = "%d" if np.isdtype(matrix.dtype, "integral") else "%.18e"
+
+    # Add index column if provided
+    if len(index.values) > 0:
+        index_col = np.array(index.values).reshape(-1, 1)
+        matrix = np.hstack([index_col, matrix])
+        header = [index.name, *header]
+        # Index is always integer, data keeps its original format
+        fmt = ["%d"] + [data_fmt] * (matrix.shape[1] - 1)
+    else:
+        fmt = data_fmt
+
     delim = ","
     header = delim.join(header)
     np.savetxt(filenaam, matrix, fmt=fmt, delimiter=delim, header=header, comments="")
