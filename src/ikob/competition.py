@@ -227,7 +227,7 @@ def competition(
     destinations = segs_source.read(destinations_path.name, scenario=scenario)
 
     income_distributions = compute_income_distributions(traveling_population if citizens else destinations)
-    subtopic_competition = "inwoners" if citizens else "arbeidsplaatsen"
+    subtopic_competition = "inwoners" if citizens else "bestemmingen"
     # Matches the suffix in potential_companies.py and employment_opportunities.py
     competition_filename_suffix = "Pot" if citizens else "Ontpl"
     competitions = DataSource(config, DataType.COMPETITION)

@@ -226,7 +226,7 @@ def test_competition_on_jobs_per_capita_sensitivity(
     key = DataKey(
         id="Totaal",
         part_of_day=pod,
-        subtopic="arbeidsplaatsen",
+        subtopic="bestemmingen",
         income=income_group,
         motive=motive,
         modality=modality,

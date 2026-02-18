@@ -171,7 +171,7 @@ class DataType(enum.Enum):
     COMPETITION = "concurrentie"
     GENERALIZED_TRAVEL_TIME = "ervarenreistijd"
     WEIGHTS = "gewichten"
-    ORIGINS = "herkomsten"
+    ORIGINS = "inwoners"
     POTENCY = "potenties"
 
 
