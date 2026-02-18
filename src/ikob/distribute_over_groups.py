@@ -255,5 +255,5 @@ def distribute_population_over_groups(config):
         "Verdeling_over_groepen",
         scenario=scenario,
         group=motive_name,
-        header=["Zone", *header],
+        header=header,
     )

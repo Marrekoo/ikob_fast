@@ -313,6 +313,7 @@ def competition(
                         income=income_group,
                         motive=motive_name,
                         modality=modality,
+                        group=car_possession_group,
                     )
                     competitions.set(key, competition_total.copy())
 
@@ -324,20 +325,57 @@ def competition(
                         subtopic=subtopic_competition,
                         income=income_group,
                         motive=motive_name,
+                        group=car_possession_group,
                     )
                     competitions.write_csv(general_totals_transpose, key, header=headstring)
 
-            header = ["Zone", "laag", "middellaag", "middelhoog", "hoog"]
+            header = ["laag", "middellaag", "middelhoog", "hoog"]
             for modality in modalities:
                 general_matrix_product = []
+                general_matrix = []
                 for income_group in income_groups:
                     key = DataKey(
-                        id=f"{competition_filename_suffix}_concproduct",
+                        "Totaal",
                         part_of_day=part_of_day,
                         motive=motive_name,
                         modality=modality,
+                        income=income_group,
+                        subtopic=subtopic_competition,
                         group=car_possession_group,
                     )
-                    competitions.write_csv(general_matrix_product, key, header=header)
+                    general_matrix.append(competitions.get(key))
+                general_totals_transpose = utils.transpose(general_matrix)
+
+                for i in range(len(citizens_or_destinations)):
+                    general_matrix_product.append([])
+                    for j in range(len(citizens_or_destinations[0])):
+                        if (citizens and (destinations[i][j] > 0)) or (
+                            (not citizens) and (traveling_population[i, j] > 0)
+                        ):
+                            general_matrix_product[i].append(
+                                general_totals_transpose[i][j] * citizens_or_destinations[i][j]
+                            )
+                        else:
+                            general_matrix_product[i].append(0)
+
+                key = DataKey(
+                    id=f"{competition_filename_suffix}_conc",
+                    part_of_day=part_of_day,
+                    subtopic=subtopic_competition,
+                    motive=motive_name,
+                    modality=modality,
+                    group=car_possession_group,
+                )
+                competitions.write_csv(general_totals_transpose, key, header=header)
+
+                key = DataKey(
+                    id=f"{competition_filename_suffix}_concproduct",
+                    part_of_day=part_of_day,
+                    subtopic=subtopic_competition,
+                    motive=motive_name,
+                    modality=modality,
+                    group=car_possession_group,
+                )
+                competitions.write_csv(general_matrix_product, key, header=header)
 
     return competitions

@@ -69,7 +69,6 @@ def reachable_population(config, single_weights: DataSource, combined_weights: D
 
     income_groups = ["laag", "middellaag", "middelhoog", "hoog"]
     headstring = modalities
-    headstringExcel = ["Zone", *modalities]
 
     segs_source = SegsSource(config)
 
@@ -240,9 +239,8 @@ def reachable_population(config, single_weights: DataSource, combined_weights: D
                 origins_total = utils.transpose(general_possibility_totals)
                 origins_total = np.round(origins_total).astype(int)
                 origins.write_csv(origins_total, key, header=headstring)
-                origins.write_xlsx(origins_total, key, header=headstringExcel)
 
-            header = ["Zone", "laag", "middellaag", "middelhoog", "hoog"]
+            header = ["laag", "middellaag", "middelhoog", "hoog"]
             for modality in modalities:
                 general_matrix_product = []
                 general_matrix = []
@@ -276,7 +274,7 @@ def reachable_population(config, single_weights: DataSource, combined_weights: D
                     motive=motive_name,
                     modality=modality,
                 )
-                origins.write_xlsx(general_total_transpose, key, header=header)
+                origins.write_csv(general_total_transpose, key, header=header)
 
                 # Section D5 regional aggregation note:
                 # The PDF defines $B_{irv}$ as a jobs-weighted aggregation over destination zones in a region.
@@ -291,6 +289,6 @@ def reachable_population(config, single_weights: DataSource, combined_weights: D
                     motive=motive_name,
                     modality=modality,
                 )
-                origins.write_xlsx(general_matrix_product, key, header=header)
+                origins.write_csv(general_matrix_product, key, header=header)
 
     return origins
