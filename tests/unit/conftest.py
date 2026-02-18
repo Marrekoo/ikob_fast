@@ -9,13 +9,13 @@ class SegsCapture:
         self.data_by_key = data_by_key
         self.writes_csv = []
 
-    def read(self, id: str, type_caster=int, scenario="", group="", modifier=""):
+    def read(self, id: str, type_caster=int, scenario="", group="", modifier="", has_index_column=False):
         key = (id, scenario)
         if key not in self.data_by_key:
             raise KeyError(f"Missing SEGS fixture for id={id!r}, scenario={scenario!r}")
         return np.array(self.data_by_key[key], dtype=type_caster)
 
-    def write_csv(self, data, id, header, group="", modifier="", scenario=""):
+    def write_csv(self, data, id, header, group="", modifier="", scenario="", index=None):
         self.writes_csv.append(
             {
                 "id": id,
