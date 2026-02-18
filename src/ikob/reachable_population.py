@@ -75,6 +75,8 @@ def reachable_population(config, single_weights: DataSource, combined_weights: D
     traveling_population = segs_source.read(traveling_population_path.name, scenario=scenario)
     destinations = segs_source.read(destinations_path.name, scenario=scenario)
 
+    num_zones = len(traveling_population)
+
     working_population = []
 
     for i in range(len(traveling_population)):
@@ -236,6 +238,7 @@ def reachable_population(config, single_weights: DataSource, combined_weights: D
                     group=car_possession_group,
                     income=income_group,
                     motive=motive_name,
+                    index=DataKey.zone_index(num_zones),
                 )
 
                 origins_total = utils.transpose(general_possibility_totals)
@@ -275,6 +278,7 @@ def reachable_population(config, single_weights: DataSource, combined_weights: D
                     group=car_possession_group,
                     motive=motive_name,
                     modality=modality,
+                    index=DataKey.zone_index(num_zones),
                 )
                 origins.write_csv(general_total_transpose, key, header=header)
 
@@ -290,6 +294,7 @@ def reachable_population(config, single_weights: DataSource, combined_weights: D
                     group=car_possession_group,
                     motive=motive_name,
                     modality=modality,
+                    index=DataKey.zone_index(num_zones),
                 )
                 origins.write_csv(general_matrix_product, key, header=header)
 

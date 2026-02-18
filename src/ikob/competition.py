@@ -237,6 +237,8 @@ def competition(
     else:
         citizens_or_destinations = destinations
 
+    num_zones = len(citizens_or_destinations)
+
     for car_possession_group in car_possession_groups:
         distribution_matrix = segs_source.read(
             "Verdeling_over_groepen",
@@ -328,6 +330,7 @@ def competition(
                         income=income_group,
                         motive=motive_name,
                         group=car_possession_group,
+                        index=DataKey.zone_index(num_zones),
                     )
                     competitions.write_csv(general_totals_transpose, key, header=headstring)
 
@@ -367,6 +370,7 @@ def competition(
                     motive=motive_name,
                     modality=modality,
                     group=car_possession_group,
+                    index=DataKey.zone_index(num_zones),
                 )
                 competitions.write_csv(general_totals_transpose, key, header=header)
 
@@ -377,6 +381,7 @@ def competition(
                     motive=motive_name,
                     modality=modality,
                     group=car_possession_group,
+                    index=DataKey.zone_index(num_zones),
                 )
                 competitions.write_csv(general_matrix_product, key, header=header)
 

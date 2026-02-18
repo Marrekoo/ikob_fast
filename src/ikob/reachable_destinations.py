@@ -67,6 +67,8 @@ def reachable_destinations(config, single_weights: DataSource, combined_weights:
     destinations_segs = segs_source.read(destinations_path.name, scenario=scenario)
     destinations = utils.transpose(destinations_segs)
 
+    num_zones = len(destinations_segs)
+
     traveling_population_totals = [sum(bbpk) for bbpk in traveling_population]
 
     income_distributions = np.zeros((len(traveling_population), len(traveling_population[0])))
@@ -157,6 +159,7 @@ def reachable_destinations(config, single_weights: DataSource, combined_weights:
                     group=car_possession_group,
                     income=income_group,
                     motive=motive_name,
+                    index=DataKey.zone_index(num_zones),
                 )
                 potencies.write_csv(general_possibility_totals_transposed, key, header=headstring)
 
@@ -196,6 +199,7 @@ def reachable_destinations(config, single_weights: DataSource, combined_weights:
                     group=car_possession_group,
                     motive=motive_name,
                     modality=modality,
+                    index=DataKey.zone_index(num_zones),
                 )
                 potencies.write_csv(general_possibility_totals_transposed, key, header=header)
 
@@ -215,6 +219,7 @@ def reachable_destinations(config, single_weights: DataSource, combined_weights:
                     group=car_possession_group,
                     motive=motive_name,
                     modality=modality,
+                    index=DataKey.zone_index(num_zones),
                 )
                 potencies.write_csv(general_matrix_product, key, header=header)
 
