@@ -89,7 +89,9 @@ class SkimsSource:
             raise DataSourceError("Skims source initialized with empty skims dir")
         self.skims_dir = pathlib.Path(skims_dir)
 
-    def read(self, id: str, dagdeel: str, type_caster=float, default: npt.NDArray | None = None) -> npt.NDArray:
+    def read(
+        self, id: str, dagdeel: str, type_caster=float, default: npt.NDArray | None = None, has_index_column=False
+    ) -> npt.NDArray:
         """Read skims from disk.
 
         Reads the skim file formed by the identifier and dagdeel.
@@ -97,7 +99,7 @@ class SkimsSource:
         """
         path = (self.skims_dir / dagdeel / id).with_suffix(".csv")
         if os.path.exists(path):
-            return utils.read_csv(path, type_caster=type_caster)
+            return utils.read_csv(path, type_caster=type_caster, has_index_column=has_index_column)
         if default is None:
             raise FileNotFoundError(f"Skim file {path} not found, with no default.")
         logger.warning(f"Skim file {path} not found, using default.")
@@ -131,7 +133,9 @@ class SegsSource:
         os.makedirs(path, exist_ok=True)
         return path / filename
 
-    def read(self, id: str, jaar="", type_caster: Type = int, scenario="", group="", modifier=""):
+    def read(
+        self, id: str, jaar="", type_caster: Type = int, scenario="", group="", modifier="", has_index_column=False
+    ):
         # TODO: This is a temporary fix. The 'Verdeling_over_groepen*'
         # files are written to disk as SEGS files. These were originally
         # written back into the _input_ directory and read out in later
@@ -149,7 +153,7 @@ class SegsSource:
 
         path = path.with_suffix(".csv")
         try:
-            return utils.read_csv(path, type_caster=type_caster)
+            return utils.read_csv(path, type_caster=type_caster, has_index_column=has_index_column)
         except FileNotFoundError:
             raise DataSourceError(
                 f"File SEGS file '{path}' not found. Is the scenario (used as subfolder) '{scenario}' correct?"
@@ -180,6 +184,8 @@ class DataKey:
     the desired data.
 
     The header and index fields are used only when writing data and are used to add semantic information to the data written
+
+    The temporary field is to indicate that the data stored at this key is not meant to be persisted and only used to store a temporary result for further computation.
     """
 
     id: str
@@ -196,6 +202,8 @@ class DataKey:
 
     header: list[str] = field(default_factory=list, compare=False)
     index: utils.CsvIndex = field(default_factory=utils.CsvIndex, compare=False)
+
+    is_temporary: bool = field(default=False, compare=False)
 
     @staticmethod
     def zone_header(num_zones):
@@ -276,10 +284,12 @@ class DataSource:
 
     def write_csv(self, data, key: DataKey, header=[]):
         assert isinstance(key, DataKey)
+        if key.is_temporary:
+            return
         path = self._make_file_path(key).with_suffix(".csv")
         if not header:
             header = key.header
-        return utils.write_csv(data, path, header=header, index=key.index)
+        utils.write_csv(data, path, header=header, index=key.index)
 
     @staticmethod
     def write_output_md(config):

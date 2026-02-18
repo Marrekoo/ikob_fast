@@ -92,6 +92,7 @@ def reachable_population(config, single_weights: DataSource, combined_weights: D
             scenario=scenario,
             group=motive_name,
             modifier="alleen_autobezit" if car_possession_group == "alleen autobezit" else "",
+            has_index_column=True,
         )
 
         citizens = create_citizens_file(distribution_matrix, working_population)
@@ -224,6 +225,7 @@ def reachable_population(config, single_weights: DataSource, combined_weights: D
                         income=income_group,
                         motive=motive_name,
                         modality=modality,
+                        is_temporary=True,
                     )
                     origins.set(key, working_population_list)
                     general_possibility_totals.append(origins.get(key))

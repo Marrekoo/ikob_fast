@@ -1,7 +1,10 @@
+import logging
 import pathlib
 from dataclasses import dataclass, field
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 def zeros(lengte):
@@ -12,7 +15,7 @@ def transpose(matrix):
     return np.array(matrix).T
 
 
-def read_csv(filenaam, type_caster=float):
+def read_csv(filenaam, type_caster=float, has_index_column=False):
     if not isinstance(filenaam, pathlib.Path):
         filenaam = pathlib.Path(filenaam)
 
@@ -22,15 +25,18 @@ def read_csv(filenaam, type_caster=float):
         matrix = np.loadtxt(filenaam, dtype=type_caster, delimiter=",")
     except ValueError:
         matrix = np.loadtxt(filenaam, dtype=type_caster, skiprows=1, delimiter=",")
-    return matrix
+    if has_index_column:
+        return matrix[:, 1:]
+    else:
+        return matrix
 
 
-def read_csv_int(filenaam):
-    return read_csv(filenaam, type_caster=int)
+def read_csv_int(filenaam, has_index_column=False):
+    return read_csv(filenaam, type_caster=int, has_index_column=has_index_column)
 
 
-def read_csv_float(filenaam):
-    return read_csv(filenaam, type_caster=float)
+def read_csv_float(filenaam, has_index_column=False):
+    return read_csv(filenaam, type_caster=float, has_index_column=has_index_column)
 
 
 @dataclass

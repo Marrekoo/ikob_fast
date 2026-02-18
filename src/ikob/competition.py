@@ -244,6 +244,7 @@ def competition(
             scenario=scenario,
             group=motive_name,
             modifier="alleen_autobezit" if car_possession_group == "alleen autobezit" else "",
+            has_index_column=True,
         )
 
         for part_of_day in part_of_days:
@@ -314,6 +315,7 @@ def competition(
                         motive=motive_name,
                         modality=modality,
                         group=car_possession_group,
+                        is_temporary=True,
                     )
                     competitions.set(key, competition_total.copy())
 

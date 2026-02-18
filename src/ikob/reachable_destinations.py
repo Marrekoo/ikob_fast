@@ -86,6 +86,7 @@ def reachable_destinations(config, single_weights: DataSource, combined_weights:
             scenario=scenario,
             group=motive_name,
             modifier="alleen_autobezit" if car_possession_group == "alleen autobezit" else "",
+            has_index_column=True,
         )
 
         distribution_matrix_transpose = utils.transpose(distribution_matrix)
@@ -142,6 +143,7 @@ def reachable_destinations(config, single_weights: DataSource, combined_weights:
                         group=car_possession_group,
                         motive=motive_name,
                         modality=modality,
+                        is_temporary=True,
                     )
                     potencies.set(key, possibility_sum.copy())
                     general_possibility_totals.append(potencies.get(key))
