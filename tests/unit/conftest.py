@@ -10,7 +10,7 @@ class SegsCapture:
         self.writes_csv = []
         self.writes_xlsx = []
 
-    def read(self, id: str, type_caster=int, scenario=""):
+    def read(self, id: str, type_caster=int, scenario="", group="", modifier=""):
         key = (id, scenario)
         if key not in self.data_by_key:
             raise KeyError(f"Missing SEGS fixture for id={id!r}, scenario={scenario!r}")
@@ -55,15 +55,15 @@ def segs_capture(monkeypatch):
         import ikob.competition as competition
         import ikob.datasource as datasource
         import ikob.distribute_over_groups as distribute_over_groups
-        import ikob.employment_opportunities as employment_opportunities
-        import ikob.potential_companies as potential_companies
+        import ikob.reachable_destinations as reachable_destinations
+        import ikob.reachable_population as reachable_population
 
         capture = SegsCapture(data_by_key)
 
         monkeypatch.setattr(datasource, "SegsSource", lambda _: capture)
         monkeypatch.setattr(distribute_over_groups, "SegsSource", lambda _: capture)
-        monkeypatch.setattr(employment_opportunities, "SegsSource", lambda _: capture)
-        monkeypatch.setattr(potential_companies, "SegsSource", lambda _: capture)
+        monkeypatch.setattr(reachable_destinations, "SegsSource", lambda _: capture)
+        monkeypatch.setattr(reachable_population, "SegsSource", lambda _: capture)
         monkeypatch.setattr(competition, "SegsSource", lambda _: capture)
         return capture
 

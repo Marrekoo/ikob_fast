@@ -45,11 +45,12 @@ def test_combined_modalities_use_elementwise_max(modality_key, modalities, prefe
     import numpy as np
 
     import ikob.combined_weights as cw
+    from ikob.configuration_definition import DecayCurveName, TvomType
     from ikob.datasource import DataKey
 
     # Prepare
     pod = "Restdag"
-    motive = "werk"
+    motive = "werk or something else"
     regime = "Basis"
 
     bike = np.array([[1.0, 0.0, 0.5], [0.0, 0.0, 0.2], [0.3, 0.1, 0.4]])
@@ -74,7 +75,13 @@ def test_combined_modalities_use_elementwise_max(modality_key, modalities, prefe
     config = {
         "__filename__": "pytest",
         "project": {
-            "motieven": [motive],
+            "motief": {
+                "naam": motive,
+                "reizende populatie": "path",
+                "bestemmingsplaatsen": "path",
+                "TVOM": TvomType.WORK,
+                "reistijdvervalscurve": DecayCurveName.WORK_AND_SOCIAL,
+            },
             "beprijzingsregime": regime,
             "paden": {
                 "output_directory": "out",

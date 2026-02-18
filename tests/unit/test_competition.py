@@ -130,7 +130,7 @@ def test_competition_on_jobs_per_capita_sensitivity(
 
     # Prepare
     pod = "Restdag"
-    motive = "werk"
+    motive = "werk or somethings else"
     regime = "Basis"
 
     citizens_income = np.array(
@@ -172,9 +172,9 @@ def test_competition_on_jobs_per_capita_sensitivity(
 
     segs_capture(
         {
-            ("Beroepsbevolking_inkomensklasse", "2023"): citizens_income,
-            ("Arbeidsplaatsen_inkomensklasse", "2023"): jobs_income_present,
-            ("Verdeling_over_groepen_Beroepsbevolking", "2023"): distribution,
+            ("reizende populatie bestand", "2023"): citizens_income,
+            ("bestemmingen bestand", "2023"): jobs_income_present,
+            ("Verdeling_over_groepen", "2023"): distribution,
         }
     )
 
@@ -203,7 +203,11 @@ def test_competition_on_jobs_per_capita_sensitivity(
         "project": {
             "verstedelijkingsscenario": "2023",
             "beprijzingsregime": regime,
-            "motieven": [motive],
+            "motief": {
+                "naam": motive,
+                "reizende populatie": "path/to/reizende populatie bestand",
+                "bestemmingsplaatsen": "path/to/bestemmingen bestand",
+            },
             "paden": {
                 "output_directory": "out",
                 "skims_directory": "skims",
@@ -216,7 +220,7 @@ def test_competition_on_jobs_per_capita_sensitivity(
     }
 
     # Act
-    competitions = comp.competition_on_jobs(config, _Weights(), _Weights(), _Origins())  # type: ignore
+    competitions = comp.competition_on_destinations(config, _Weights(), _Weights(), _Origins())  # type: ignore
 
     # Assert
     key = DataKey(

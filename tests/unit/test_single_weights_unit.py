@@ -5,6 +5,7 @@ import pytest
 @pytest.mark.parametrize("modality", ["Auto", "OV", "Fiets"])
 @pytest.mark.parametrize("preference", ["Auto", "OV", "Fiets"])
 def test_calculate_weights_threshold_and_monotonicity(modality, preference):
+    from ikob.configuration_definition import DecayCurveName
     from ikob.single_weights import calculate_weights
 
     # Prepare
@@ -19,7 +20,9 @@ def test_calculate_weights_threshold_and_monotonicity(modality, preference):
     )
 
     # Act
-    weights = calculate_weights(gtt, modality=modality, preference=preference, motive="werk")
+    weights = calculate_weights(
+        gtt, modality=modality, preference=preference, decay_curve_name=DecayCurveName.WORK_AND_SOCIAL
+    )
 
     # Assert
     # Hard threshold at 180 minutes.
@@ -32,11 +35,12 @@ def test_calculate_weights_threshold_and_monotonicity(modality, preference):
 
 def test_calculate_single_weights_writes_expected_keys():
     import ikob.single_weights as sw
+    from ikob.configuration_definition import DecayCurveName, TvomType
     from ikob.datasource import DataKey
 
     # Prepare
     pod = "Restdag"
-    motive = "werk"
+    motive = "werk or something else"
     regime = "Basis"
 
     constant_gtt = np.array([[10.0, 20.0], [30.0, 40.0]])
@@ -50,7 +54,13 @@ def test_calculate_single_weights_writes_expected_keys():
     config = {
         "__filename__": "pytest",
         "project": {
-            "motieven": [motive],
+            "motief": {
+                "naam": motive,
+                "reizende populatie": "path",
+                "bestemmingsplaatsen": "path",
+                "TVOM": TvomType.WORK,
+                "reistijdvervalscurve": DecayCurveName.WORK_AND_SOCIAL,
+            },
             "beprijzingsregime": regime,
             "fiets of E-fiets": {"E-fiets": False},
             "paden": {

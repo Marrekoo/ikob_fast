@@ -5,7 +5,6 @@ import pathlib
 from dataclasses import dataclass
 from typing import Optional, Type
 
-import numpy as np
 import numpy.typing as npt
 from numpy.typing import NDArray
 
@@ -89,7 +88,7 @@ class SkimsSource:
             raise DataSourceError("Skims source initialized with empty skims dir")
         self.skims_dir = pathlib.Path(skims_dir)
 
-    def read(self, id: str, dagdeel: str, type_caster=float, default: npt.NDArray = np.array([])) -> npt.NDArray:
+    def read(self, id: str, dagdeel: str, type_caster=float, default: npt.NDArray | None = None) -> npt.NDArray:
         """Read skims from disk.
 
         Reads the skim file formed by the identifier and dagdeel.
@@ -98,6 +97,8 @@ class SkimsSource:
         path = (self.skims_dir / dagdeel / id).with_suffix(".csv")
         if os.path.exists(path):
             return utils.read_csv(path, type_caster=type_caster)
+        if default is None:
+            raise FileNotFoundError(f"Skim file {path} not found, with no default.")
         logger.warning(f"Skim file {path} not found, using default.")
         return default
 
@@ -129,7 +130,7 @@ class SegsSource:
         os.makedirs(path, exist_ok=True)
         return path / filename
 
-    def read(self, id: str, jaar="", type_caster: Type = int, scenario=""):
+    def read(self, id: str, jaar="", type_caster: Type = int, scenario="", group="", modifier=""):
         # TODO: This is a temporary fix. The 'Verdeling_over_groepen*'
         # files are written to disk as SEGS files. These were originally
         # written back into the _input_ directory and read out in later
@@ -141,7 +142,7 @@ class SegsSource:
         should_read_from_output = "Verdeling_over_groepen" in id
 
         if should_read_from_output:
-            path = self._segs_output_dir(id, jaar, scenario)
+            path = self._segs_output_dir(id=id, jaar=jaar, scenario=scenario, group=group, modifier=modifier)
         else:
             path = self._segs_input_dir(id, jaar, scenario)
 

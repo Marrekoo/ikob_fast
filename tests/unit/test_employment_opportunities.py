@@ -11,10 +11,10 @@ import pytest
 )
 def employment_opportunities_setup(request, monkeypatch, segs_capture):
     """Common setup for employment opportunities tests."""
-    import ikob.employment_opportunities as employment_opportunities
+    import ikob.reachable_destinations as reachable_destinations
 
     pod = "Restdag"
-    motive = "werk"
+    motive = "werk or something else"
     regime = "Basis"
 
     # Working population size should not matter for total employment opportunities.
@@ -54,12 +54,12 @@ def employment_opportunities_setup(request, monkeypatch, segs_capture):
         {
             ("Beroepsbevolking_inkomensklasse", "2023"): working_pop_income,
             ("Arbeidsplaatsen_inkomensklasse", "2023"): jobs_income,
-            ("Verdeling_over_groepen_Beroepsbevolking", "2023"): distribution,
+            ("Verdeling_over_groepen", "2023"): distribution,
         }
     )
 
     # Use the parametrized weight matrix
-    monkeypatch.setattr(employment_opportunities, "get_weight_matrix", lambda *args, **kwargs: request.param)
+    monkeypatch.setattr(reachable_destinations, "get_weight_matrix", lambda *args, **kwargs: request.param)
 
     # Capture xlsx writes
     xlsx_writes = []
@@ -67,8 +67,8 @@ def employment_opportunities_setup(request, monkeypatch, segs_capture):
     def capture_write_xlsx(self, data, key, header=None):
         xlsx_writes.append({"data": data, "key": key, "header": header})
 
-    monkeypatch.setattr(employment_opportunities.DataSource, "write_csv", lambda *args, **kwargs: None)
-    monkeypatch.setattr(employment_opportunities.DataSource, "write_xlsx", capture_write_xlsx)
+    monkeypatch.setattr(reachable_destinations.DataSource, "write_csv", lambda *args, **kwargs: None)
+    monkeypatch.setattr(reachable_destinations.DataSource, "write_xlsx", capture_write_xlsx)
 
     class _Weights:
         def get(self, _key):
@@ -79,7 +79,11 @@ def employment_opportunities_setup(request, monkeypatch, segs_capture):
         "project": {
             "verstedelijkingsscenario": "2023",
             "beprijzingsregime": regime,
-            "motieven": [motive],
+            "motief": {
+                "naam": motive,
+                "reizende populatie": "path/to/Beroepsbevolking_inkomensklasse",
+                "bestemmingsplaatsen": "path/to/Arbeidsplaatsen_inkomensklasse",
+            },
             "welke_inkomensgroepen": ["laag", "middellaag", "middelhoog", "hoog"],
             "paden": {
                 "output_directory": "out",
@@ -92,7 +96,7 @@ def employment_opportunities_setup(request, monkeypatch, segs_capture):
         "geavanceerd": {"welke_groepen": ["alle groepen"]},
     }
 
-    potencies = employment_opportunities.employment_opportunities(config, _Weights(), _Weights())  # type: ignore
+    potencies = reachable_destinations.reachable_destinations(config, _Weights(), _Weights())  # type: ignore
 
     return {
         "potencies": potencies,
