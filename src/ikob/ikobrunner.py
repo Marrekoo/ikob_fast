@@ -6,14 +6,14 @@ import traceback
 from tkinter import BooleanVar, Button, Frame, StringVar, Tk, Widget, filedialog, messagebox
 
 from ikob.combined_weights import calculate_combined_weights
-from ikob.competition import competition_on_citizens, competition_on_jobs
-from ikob.config import widgets
+from ikob.competition import competition_on_citizens, competition_on_destinations
+from ikob.config import validate, widgets
 from ikob.datasource import DataSource, DataType
 from ikob.distribute_over_groups import distribute_population_over_groups
-from ikob.employment_opportunities import employment_opportunities
 from ikob.generalized_travel_time import generalized_travel_time
 from ikob.ikobconfig import get_config_from_args, load_config
-from ikob.potential_companies import potential_companies
+from ikob.reachable_destinations import reachable_destinations
+from ikob.reachable_population import reachable_population
 from ikob.single_weights import calculate_single_weights
 
 logger = logging.getLogger(__name__)
@@ -35,6 +35,10 @@ def run_scripts(project_file, skip_steps: list[bool] | None = None, write_weight
     """
     logger.info("Reading project file: %s.", project_file)
     config = get_config_from_args(project_file)
+
+    valid = validate.FileValidator(config).validate_input_files()
+    if not valid:
+        raise ValueError("Invalid input files, see console warnings.")
 
     logger.info("Starting simulations...")
     if not skip_steps:
@@ -60,19 +64,19 @@ def run_scripts(project_file, skip_steps: list[bool] | None = None, write_weight
         combined_weights = DataSource(config, DataType.WEIGHTS)
 
     if not skip_steps[4]:
-        opportunities = employment_opportunities(config, single_weights, combined_weights)
+        opportunities = reachable_destinations(config, single_weights, combined_weights)
     else:
         opportunities = DataSource(config, DataType.DESTINATIONS)
 
     if not skip_steps[5]:
-        origins = potential_companies(config, single_weights, combined_weights)
+        origins = reachable_population(config, single_weights, combined_weights)
     else:
         origins = DataSource(config, DataType.ORIGINS)
 
     if not skip_steps[6]:
-        competition_jobs = competition_on_jobs(config, single_weights, combined_weights, origins)
+        competition_destinations = competition_on_destinations(config, single_weights, combined_weights, origins)
     else:
-        competition_jobs = DataSource(config, DataType.COMPETITION)
+        competition_destinations = DataSource(config, DataType.COMPETITION)
 
     if not skip_steps[7]:
         competition_citizens = competition_on_citizens(config, single_weights, combined_weights, opportunities)
@@ -85,7 +89,7 @@ def run_scripts(project_file, skip_steps: list[bool] | None = None, write_weight
     # end-to-end testing. Ultimately only files that are essential outputs
     # should persist.
     logger.info("Writing output to disk...")
-    sources_to_save = [travel_time, opportunities, origins, competition_citizens, competition_jobs]
+    sources_to_save = [travel_time, opportunities, origins, competition_citizens, competition_destinations]
     if write_weights:
         sources_to_save.extend([single_weights, combined_weights])
 
@@ -96,8 +100,6 @@ def run_scripts(project_file, skip_steps: list[bool] | None = None, write_weight
 
 
 # User interface
-
-
 class ConfigApp(Tk):
     PAD_X = 5
     PAD_Y = 5

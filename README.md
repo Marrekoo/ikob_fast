@@ -8,7 +8,9 @@ This data is used to create accessibility profiles for several groups within soc
 Potential accessibility is calculated in analogy with [Hansen (1958)](https://www.tandfonline.com/doi/abs/10.1080/01944365908978307 "Subscription needed"). It uses distance decay curves for each mode, based on time and cost (perception) by each group in society.
 So, the further away an amenity (like a job location) is, the less it will count as a full option. The calculated potential accessibility, therefore, is a weighted amount.
 
-Some commonly used abbreviations / jargon / odd terms:
+### Nomenclature
+
+Some commonly used abbreviations / jargon:
 - TVOM: Time value of money, how much money a unit of time is worth.  
   Used to combine both travel time and travel costs into a single metric.
 - SEGS: Sociaal-economische gegevens (Social-Economic data).  
@@ -19,6 +21,9 @@ Some commonly used abbreviations / jargon / odd terms:
 - ICE: Internal combustion engine. Also referred to using fuel_kind 'fossiel'. 
 - vk: (dutch) voorkeur / (english) preference
 - groups: See [Groups](./README.md#groups)
+
+In the past, IKOB was focussed on commuting trips. You might see this reflected in nomenclature where terms like 'employment', 'jobs' are used to indicate the traveling population and their destinations.
+Ikob since has been generalized to allow for different motives, but you might see this remnants of this old approach. 
 
 ## Installation and usage
 
@@ -210,3 +215,8 @@ The code uses the following groups:
 
 Where each group is additionally suffixed by an income class to split the population up further.\
 In [distribute_over_groups.py](./src/ikob/distribute_over_groups.py) the population of each zone is distributed over these groups according to social-economic data.
+# Motieven 
+
+A run of ikob is always for a specific travel motive. In the project config you can configure the name of the motive, the corresponding traveling population and the destinations corresponding to the travel motive. In addition, it's also possible to configure the time value of money used for the motive, and the travel time decay curve to use.
+
+When you run ikob for multiple different motives in sequence, the results are separated in the results directory (generally by a subdirectory with the motive name). 
