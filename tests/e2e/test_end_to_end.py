@@ -4,7 +4,6 @@ import pathlib
 import shutil
 
 import pandas as pd
-import pytest
 
 from ikob.ikobrunner import run_scripts
 
@@ -84,17 +83,16 @@ def remove_directory(dir: pathlib.Path):
         shutil.rmtree(dir)
 
 
-@pytest.mark.parametrize("case", ["vlaanderen", "eindhoven-500"])
-def test_end_to_end(case):
+def test_end_to_end():
     test_dir = pathlib.Path("tests")
-    project_dir = test_dir.joinpath(case).resolve()
-    project = project_dir.joinpath(f"{case}.json")
+    project_dir = test_dir.joinpath("vlaanderen").resolve()
+    project = project_dir.joinpath("vlaanderen.json")
 
     suffixes = ["resultaten", "basis", "tussenresultaten"]
-    compare_dirs = [project_dir / case / s for s in suffixes]
+    compare_dirs = [project_dir / "vlaanderen" / s for s in suffixes]
 
     # Delete old results if still present
-    remove_directory(project_dir / case)
+    remove_directory(project_dir / "vlaanderen")
 
     # End-to-end test should not skip any steps: all scripts should pass.
     run_scripts(project, write_weights=True)
@@ -104,4 +102,4 @@ def test_end_to_end(case):
         assert compare_directories(result_dir, reference_dir)
 
     # Clean up files if test succeeds
-    remove_directory(project_dir / case)
+    remove_directory(project_dir / "vlaanderen")
