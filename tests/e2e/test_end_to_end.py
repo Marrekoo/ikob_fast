@@ -51,25 +51,25 @@ def is_equal_file(result: pathlib.Path, reference: pathlib.Path) -> bool:
 
 def same_directory(dcmp: filecmp.dircmp) -> bool:
     """Recursively compare directories for differing files."""
-
+    same = True
     # File is only present in one of the directory trees.
     if dcmp.left_only or dcmp.right_only:
         msg = f"Result and reference directories contain different files:{dcmp.left_only}, {dcmp.right_only}"
         logger.warning(msg)
-        return False
+        same = False
 
     for filepath in dcmp.diff_files:
         result = pathlib.Path(dcmp.left) / filepath
         reference = pathlib.Path(dcmp.right) / filepath
         if not is_equal_file(result, reference):
-            return False
+            same = False
 
     # Recursively compare directories.
     for sub_dcmp in dcmp.subdirs.values():
         if not same_directory(sub_dcmp):
-            return False
+            same = False
 
-    return True
+    return same
 
 
 def compare_directories(result, reference) -> bool:
