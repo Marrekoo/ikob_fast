@@ -103,7 +103,13 @@ def add_bike_weights(
 
                 if preference == "Auto":
                     key = DataKey(
-                        "Fiets_vk", part_of_day=part_of_day, regime=regimes, motive=motive_name, income=income
+                        "Fiets_vk",
+                        part_of_day=part_of_day,
+                        regime=regimes,
+                        motive=motive_name,
+                        income=income,
+                        header=DataKey.zone_header(num_zones),
+                        index=DataKey.zone_index(num_zones),
                     )
                 else:
                     key = DataKey(
@@ -247,8 +253,8 @@ def add_free_car_weights(
             income=income,
             regime=regimes,
             motive=motive_name,
-            # header=DataKey.zone_header(num_zones),
-            # index=DataKey.zone_index(num_zones),
+            header=DataKey.zone_header(num_zones),
+            index=DataKey.zone_index(num_zones),
         )
         weights.set(key, weight_matrix.copy())
 

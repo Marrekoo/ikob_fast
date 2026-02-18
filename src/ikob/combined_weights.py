@@ -170,6 +170,8 @@ def calculate_combined_weights(config, single_weights: DataSource) -> DataSource
                                 motive=motive_name,
                                 preference=preference,
                                 subtopic="combinaties",
+                                header=DataKey.zone_header(len(max_matrix)),
+                                index=DataKey.zone_index(len(max_matrix)),
                             )
                             # Max weight of taking either the car or the bike
                             combined_weights.set(key, max_matrix.copy())
@@ -211,6 +213,8 @@ def calculate_combined_weights(config, single_weights: DataSource) -> DataSource
                                     preference=preference,
                                     subtopic="combinaties",
                                     fuel_kind=fuel_kind,
+                                    header=DataKey.zone_header(len(max_matrix)),
+                                    index=DataKey.zone_index(len(max_matrix)),
                                 )
                                 # Max weight of taking either the car or pt
                                 combined_weights.set(key, max_matrix.copy())
@@ -234,6 +238,8 @@ def calculate_combined_weights(config, single_weights: DataSource) -> DataSource
                                 motive=motive_name,
                                 preference=preference,
                                 subtopic="combinaties",
+                                header=DataKey.zone_header(len(max_matrix)),
+                                index=DataKey.zone_index(len(max_matrix)),
                             )
                             # Max weight of taking either the car or pt
                             combined_weights.set(key, max_matrix.copy())
