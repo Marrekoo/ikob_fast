@@ -19,8 +19,8 @@ def file_to_frame(path: pathlib.Path) -> pd.DataFrame:
     raise ValueError(f"Calling file to frame with unknown extension {path.suffix}. Must be .csv")
 
 
-def is_equal_excel_csv(result: pathlib.Path, reference: pathlib.Path) -> bool:
-    """Compare Excel/CSV files up to numerical tolerances."""
+def is_equal_csv(result: pathlib.Path, reference: pathlib.Path) -> bool:
+    """Compare CSV files up to numerical tolerances."""
     result_frame = file_to_frame(result)
     reference_frame = file_to_frame(reference)
 
@@ -35,7 +35,7 @@ def is_equal_excel_csv(result: pathlib.Path, reference: pathlib.Path) -> bool:
 def is_equal_file(result: pathlib.Path, reference: pathlib.Path) -> bool:
     """Compare if two files are the same.
 
-    For Excel (.xlsx) and CSV (.csv) files a specialized comparison
+    For CSV (.csv) files a specialized comparison
     is used to allow for some numerical tolerances to exist between
     both files.
     """
@@ -43,8 +43,8 @@ def is_equal_file(result: pathlib.Path, reference: pathlib.Path) -> bool:
         logger.warning(f"File {result} and {reference} have different suffix.")
         return False
 
-    if result.suffix in [".xlsx", ".csv"]:
-        return is_equal_excel_csv(result, reference)
+    if result.suffix in [".csv"]:
+        return is_equal_csv(result, reference)
 
     return filecmp.cmp(result, reference, shallow=False)
 
