@@ -69,12 +69,13 @@ def reachable_population(config, single_weights: DataSource, combined_weights: D
 
     income_groups = ["laag", "middellaag", "middelhoog", "hoog"]
     headstring = modalities
-    headstringExcel = ["Zone", *modalities]
 
     segs_source = SegsSource(config)
 
     traveling_population = segs_source.read(traveling_population_path.name, scenario=scenario)
     destinations = segs_source.read(destinations_path.name, scenario=scenario)
+
+    num_zones = len(traveling_population)
 
     working_population = []
 
@@ -93,6 +94,7 @@ def reachable_population(config, single_weights: DataSource, combined_weights: D
             scenario=scenario,
             group=motive_name,
             modifier="alleen_autobezit" if car_possession_group == "alleen autobezit" else "",
+            has_index_column=True,
         )
 
         citizens = create_citizens_file(distribution_matrix, working_population)
@@ -225,6 +227,7 @@ def reachable_population(config, single_weights: DataSource, combined_weights: D
                         income=income_group,
                         motive=motive_name,
                         modality=modality,
+                        is_temporary=True,
                     )
                     origins.set(key, working_population_list)
                     general_possibility_totals.append(origins.get(key))
@@ -235,14 +238,14 @@ def reachable_population(config, single_weights: DataSource, combined_weights: D
                     group=car_possession_group,
                     income=income_group,
                     motive=motive_name,
+                    index=DataKey.zone_index(num_zones),
                 )
 
                 origins_total = utils.transpose(general_possibility_totals)
                 origins_total = np.round(origins_total).astype(int)
                 origins.write_csv(origins_total, key, header=headstring)
-                origins.write_xlsx(origins_total, key, header=headstringExcel)
 
-            header = ["Zone", "laag", "middellaag", "middelhoog", "hoog"]
+            header = ["laag", "middellaag", "middelhoog", "hoog"]
             for modality in modalities:
                 general_matrix_product = []
                 general_matrix = []
@@ -275,8 +278,9 @@ def reachable_population(config, single_weights: DataSource, combined_weights: D
                     group=car_possession_group,
                     motive=motive_name,
                     modality=modality,
+                    index=DataKey.zone_index(num_zones),
                 )
-                origins.write_xlsx(general_total_transpose, key, header=header)
+                origins.write_csv(general_total_transpose, key, header=header)
 
                 # Section D5 regional aggregation note:
                 # The PDF defines $B_{irv}$ as a jobs-weighted aggregation over destination zones in a region.
@@ -290,7 +294,8 @@ def reachable_population(config, single_weights: DataSource, combined_weights: D
                     group=car_possession_group,
                     motive=motive_name,
                     modality=modality,
+                    index=DataKey.zone_index(num_zones),
                 )
-                origins.write_xlsx(general_matrix_product, key, header=header)
+                origins.write_csv(general_matrix_product, key, header=header)
 
     return origins

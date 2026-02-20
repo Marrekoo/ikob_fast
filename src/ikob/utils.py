@@ -1,7 +1,10 @@
+import logging
 import pathlib
+from dataclasses import dataclass, field
 
 import numpy as np
-import xlsxwriter
+
+logger = logging.getLogger(__name__)
 
 
 def zeros(lengte):
@@ -12,20 +15,7 @@ def transpose(matrix):
     return np.array(matrix).T
 
 
-def write_xls(matrix, filenaam, header):
-    if not isinstance(filenaam, pathlib.Path):
-        filenaam = pathlib.Path(filenaam)
-
-    workbook = xlsxwriter.Workbook(filenaam)
-    worksheet = workbook.add_worksheet()
-    worksheet.write_row(0, 0, header)
-    for r in range(0, len(matrix)):
-        worksheet.write(r + 1, 0, r + 1)
-        worksheet.write_row(r + 1, 1, matrix[r])
-    workbook.close()
-
-
-def read_csv(filenaam, type_caster=float):
+def read_csv(filenaam, type_caster=float, has_index_column=False):
     if not isinstance(filenaam, pathlib.Path):
         filenaam = pathlib.Path(filenaam)
 
@@ -35,18 +25,31 @@ def read_csv(filenaam, type_caster=float):
         matrix = np.loadtxt(filenaam, dtype=type_caster, delimiter=",")
     except ValueError:
         matrix = np.loadtxt(filenaam, dtype=type_caster, skiprows=1, delimiter=",")
-    return matrix
+    if has_index_column:
+        return matrix[:, 1:]
+    else:
+        return matrix
 
 
-def read_csv_int(filenaam):
-    return read_csv(filenaam, type_caster=int)
+def read_csv_int(filenaam, has_index_column=False):
+    return read_csv(filenaam, type_caster=int, has_index_column=has_index_column)
 
 
-def read_csv_float(filenaam):
-    return read_csv(filenaam, type_caster=float)
+def read_csv_float(filenaam, has_index_column=False):
+    return read_csv(filenaam, type_caster=float, has_index_column=has_index_column)
 
 
-def write_csv(matrix, filenaam, header=[]):
+@dataclass
+class CsvIndex:
+    name: str = ""
+    values: list[int] = field(default_factory=list)
+
+    @classmethod
+    def zone_index(cls, num_zones):
+        return cls("zone", list(range(num_zones)))
+
+
+def write_csv(matrix, filenaam, index=CsvIndex(), header=[]):
     if not isinstance(filenaam, pathlib.Path):
         filenaam = pathlib.Path(filenaam)
 
@@ -56,7 +59,19 @@ def write_csv(matrix, filenaam, header=[]):
         # np.savetxt writes this by default as one column.
         matrix = matrix.reshape(1, matrix.shape[0])
 
-    fmt = "%d" if np.isdtype(matrix.dtype, "integral") else "%.18e"
+    # Determine format for data
+    data_fmt = "%d" if np.isdtype(matrix.dtype, "integral") else "%.18e"
+
+    # Add index column if provided
+    if len(index.values) > 0:
+        index_col = np.array(index.values).reshape(-1, 1)
+        matrix = np.hstack([index_col, matrix])
+        header = [index.name, *header]
+        # Index is always integer, data keeps its original format
+        fmt = ["%d"] + [data_fmt] * (matrix.shape[1] - 1)
+    else:
+        fmt = data_fmt
+
     delim = ","
     header = delim.join(header)
     np.savetxt(filenaam, matrix, fmt=fmt, delimiter=delim, header=header, comments="")

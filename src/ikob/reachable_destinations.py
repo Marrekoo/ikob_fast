@@ -60,13 +60,14 @@ def reachable_destinations(config, single_weights: DataSource, combined_weights:
 
     modalities = ["Fiets", "Auto", "OV", "Auto_Fiets", "OV_Fiets", "Auto_OV", "Auto_OV_Fiets"]
     headstring = ["Fiets", "Auto", "OV", "Auto_Fiets", "OV_Fiets", "Auto_OV", "Auto_OV_Fiets"]
-    headstringExcel = ["Zone", "Fiets", "Auto", "OV", "Auto_Fiets", "OV_Fiets", "Auto_OV", "Auto_OV_Fiets"]
 
     segs_source = SegsSource(config)
 
     traveling_population = segs_source.read(traveling_population_path.name, scenario=scenario)
     destinations_segs = segs_source.read(destinations_path.name, scenario=scenario)
     destinations = utils.transpose(destinations_segs)
+
+    num_zones = len(destinations_segs)
 
     traveling_population_totals = [sum(bbpk) for bbpk in traveling_population]
 
@@ -87,6 +88,7 @@ def reachable_destinations(config, single_weights: DataSource, combined_weights:
             scenario=scenario,
             group=motive_name,
             modifier="alleen_autobezit" if car_possession_group == "alleen autobezit" else "",
+            has_index_column=True,
         )
 
         distribution_matrix_transpose = utils.transpose(distribution_matrix)
@@ -143,6 +145,7 @@ def reachable_destinations(config, single_weights: DataSource, combined_weights:
                         group=car_possession_group,
                         motive=motive_name,
                         modality=modality,
+                        is_temporary=True,
                     )
                     potencies.set(key, possibility_sum.copy())
                     general_possibility_totals.append(potencies.get(key))
@@ -156,11 +159,11 @@ def reachable_destinations(config, single_weights: DataSource, combined_weights:
                     group=car_possession_group,
                     income=income_group,
                     motive=motive_name,
+                    index=DataKey.zone_index(num_zones),
                 )
                 potencies.write_csv(general_possibility_totals_transposed, key, header=headstring)
-                potencies.write_xlsx(general_possibility_totals_transposed, key, header=headstringExcel)
 
-            header = ["Zone", "laag", "middellaag", "middelhoog", "hoog"]
+            header = ["laag", "middellaag", "middelhoog", "hoog"]
             for modality in modalities:
                 general_matrix_product = []
                 general_matrix = []
@@ -196,8 +199,9 @@ def reachable_destinations(config, single_weights: DataSource, combined_weights:
                     group=car_possession_group,
                     motive=motive_name,
                     modality=modality,
+                    index=DataKey.zone_index(num_zones),
                 )
-                potencies.write_xlsx(general_possibility_totals_transposed, key, header=header)
+                potencies.write_csv(general_possibility_totals_transposed, key, header=header)
 
                 # section D4 regional aggregation note:
                 # The PDF defines $B_{irv}$ as a population-weighted aggregation of zone-level reachability
@@ -215,7 +219,8 @@ def reachable_destinations(config, single_weights: DataSource, combined_weights:
                     group=car_possession_group,
                     motive=motive_name,
                     modality=modality,
+                    index=DataKey.zone_index(num_zones),
                 )
-                potencies.write_xlsx(general_matrix_product, key, header=header)
+                potencies.write_csv(general_matrix_product, key, header=header)
 
     return potencies

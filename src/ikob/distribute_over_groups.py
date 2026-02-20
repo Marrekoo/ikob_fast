@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 import numpy.typing as npt
 
+from ikob import utils
 from ikob.datasource import SegsSource, read_csv_from_config
 
 logger = logging.getLogger(__name__)
@@ -241,27 +242,20 @@ def distribute_population_over_groups(config):
                 survey_per_income_class[i].append(0)
 
     logger.debug("Total car possessions: %s", total_car_possession_survey)
-    segs_source.write_csv(total_survey, "Verdeling_over_groepen", scenario=scenario, group=motive_name, header=header)
     segs_source.write_csv(
         survey_per_income_class,
         "Verdeling_over_groepen",
         scenario=scenario,
         group=motive_name,
-        header=header,
         modifier="alleen_autobezit",
+        header=header,
+        index=utils.CsvIndex.zone_index(len(total_survey)),
     )
-    segs_source.write_xlsx(
+    segs_source.write_csv(
         total_survey,
         "Verdeling_over_groepen",
         scenario=scenario,
         group=motive_name,
-        header=["Zone", *header],
-    )
-    segs_source.write_xlsx(
-        survey_per_income_class,
-        "Verdeling_over_groepen",
-        scenario=scenario,
-        group=motive_name,
-        header=["Zone", *header],
-        modifier="alleen_autobezit",
+        header=header,
+        index=utils.CsvIndex.zone_index(len(total_survey)),
     )

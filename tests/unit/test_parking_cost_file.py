@@ -21,4 +21,4 @@ def test_config_with_parking_cost_file():
     assert compare_directories(result_dir, reference_dir)
 
     # Clean up files if test succeeds
-    remove_directory(result_dir)
+    remove_directory(project_dir / f"{case}")

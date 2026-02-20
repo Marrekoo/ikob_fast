@@ -18,6 +18,9 @@ Some commonly used abbreviations / jargon:
 - skims: Data to determine an impedance ('friction') matrix from zone to zone.  
   For example: A matrix of distances via car from zone to zone, costs per kilometer of traveling by car, etc.
 - GTR: Generalized travel time
+- ICE: Internal combustion engine. Also referred to using fuel_kind 'fossiel'. 
+- vk: (dutch) voorkeur / (english) preference
+- groups: See [Groups](./README.md#groups)
 
 In the past, IKOB was focussed on commuting trips. You might see this reflected in nomenclature where terms like 'employment', 'jobs' are used to indicate the traveling population and their destinations.
 Ikob since has been generalized to allow for different motives, but you might see this remnants of this old approach. 
@@ -172,10 +175,46 @@ There are some reference tests:
 - tests/unit/test_group_distribution.py
 
 These compare current output against stored reference output.
-These detect when output has changed but don't verify expected behavior.
+These detect when output has changed but don't verify expected behavior. 
 
 To generate new reference data for these tests it's easiest to just run the test without deleting the computed results at the end. In general this boils down to removing the `remove_directory` call. If the test uses a [temporary test directory](https://docs.pytest.org/en/6.2.x/tmpdir.html#the-tmpdir-fixture) or something similar, it's easiest to make that a concrete path and get the results from there. 
 
+# Output
+
+See OUTPUT.md for the structure of the output (results) directory. This file is also included in the output directory produced by the code.
+
+# Groups 
+
+The code uses the term 'groups' a lot to refer to different slices of the population. Income groups (income classes) are different from groups. 
+
+The code uses the following income classes:
+- low
+- medium-low
+- medium-high
+- high
+
+The groups are there to differentiate slices of the population with different modalities at their disposal and with different preferences.\
+The code uses the following groups:
+| Group | Description |
+|---|---|
+| GratisAuto | Those with a free car |
+| GratisAuto_GratisOV | Those with a free car and free public transport |
+| WelAuto_GratisOV | Those with a car and free public transport |
+| WelAuto_vkAuto | Those with a car and a preference for car |
+| WelAuto_vkNeutraal | Those with a car and a neutral preference |
+| WelAuto_vkFiets | Those with a car and a preference for cycling |
+| WelAuto_vkOV | Those with a car and a preference for public transport |
+| GeenAuto_GratisOV | Those without a car and free public transport |
+| GeenAuto_vkNeutraal | Those without a car and a neutral preference |
+| GeenAuto_vkFiets | Those without a car and a preference for cycling |
+| GeenAuto_vkOV | Those without a car and a preference for public transport |
+| GeenRijbewijs_GratisOV | Those without a driver’s license and free public transport |
+| GeenRijbewijs_vkNeutraal | Those without a driver’s license and a neutral preference |
+| GeenRijbewijs_vkFiets | Those without a driver’s license and a preference for cycling |
+| GeenRijbewijs_vkOV | Those without a driver’s license and a preference for public transport |
+
+Where each group is additionally suffixed by an income class to split the population up further.\
+In [distribute_over_groups.py](./src/ikob/distribute_over_groups.py) the population of each zone is distributed over these groups according to social-economic data.
 # Motieven 
 
 A run of ikob is always for a specific travel motive. In the project config you can configure the name of the motive, the corresponding traveling population and the destinations corresponding to the travel motive. In addition, it's also possible to configure the time value of money used for the motive, and the travel time decay curve to use.

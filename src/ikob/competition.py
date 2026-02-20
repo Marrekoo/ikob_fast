@@ -220,7 +220,6 @@ def competition(
     modalities = ["Fiets", "Auto", "OV", "Auto_Fiets", "OV_Fiets", "Auto_OV", "Auto_OV_Fiets"]
     income_groups = ["laag", "middellaag", "middelhoog", "hoog"]
     headstring = ["Fiets", "Auto", "OV", "Auto_Fiets", "OV_Fiets", "Auto_OV", "Auto_OV_Fiets"]
-    headstringExcel = ["Zone", "Fiets", "Auto", "OV", "Auto-Fiets", "OV_Fiets", "Auto_OV", "Auto_OV_Fiets"]
 
     segs_source = SegsSource(config)
 
@@ -228,13 +227,17 @@ def competition(
     destinations = segs_source.read(destinations_path.name, scenario=scenario)
 
     income_distributions = compute_income_distributions(traveling_population if citizens else destinations)
-    subtopic_competition = "inwoners" if citizens else "arbeidsplaatsen"
+    subtopic_competition = "inwoners" if citizens else "bestemmingen"
+    # Matches the suffix in potential_companies.py and employment_opportunities.py
+    competition_filename_suffix = "Pot" if citizens else "Ontpl"
     competitions = DataSource(config, DataType.COMPETITION)
 
     if citizens:
         citizens_or_destinations = traveling_population
     else:
         citizens_or_destinations = destinations
+
+    num_zones = len(citizens_or_destinations)
 
     for car_possession_group in car_possession_groups:
         distribution_matrix = segs_source.read(
@@ -243,6 +246,7 @@ def competition(
             scenario=scenario,
             group=motive_name,
             modifier="alleen_autobezit" if car_possession_group == "alleen autobezit" else "",
+            has_index_column=True,
         )
 
         for part_of_day in part_of_days:
@@ -312,22 +316,25 @@ def competition(
                         income=income_group,
                         motive=motive_name,
                         modality=modality,
+                        group=car_possession_group,
+                        is_temporary=True,
                     )
                     competitions.set(key, competition_total.copy())
 
                     general_possibility_totals.append(competitions.get(key))
                     general_totals_transpose = utils.transpose(general_possibility_totals)
                     key = DataKey(
-                        id="Ontpl_conc",
+                        id=f"{competition_filename_suffix}_conc",
                         part_of_day=part_of_day,
                         subtopic=subtopic_competition,
                         income=income_group,
                         motive=motive_name,
+                        group=car_possession_group,
+                        index=DataKey.zone_index(num_zones),
                     )
                     competitions.write_csv(general_totals_transpose, key, header=headstring)
-                    competitions.write_xlsx(general_totals_transpose, key, header=headstringExcel)
 
-            header = ["Zone", "laag", "middellaag", "middelhoog", "hoog"]
+            header = ["laag", "middellaag", "middelhoog", "hoog"]
             for modality in modalities:
                 general_matrix_product = []
                 general_matrix = []
@@ -339,6 +346,7 @@ def competition(
                         modality=modality,
                         income=income_group,
                         subtopic=subtopic_competition,
+                        group=car_possession_group,
                     )
                     general_matrix.append(competitions.get(key))
                 general_totals_transpose = utils.transpose(general_matrix)
@@ -356,21 +364,25 @@ def competition(
                             general_matrix_product[i].append(0)
 
                 key = DataKey(
-                    id="Ontpl_conc",
+                    id=f"{competition_filename_suffix}_conc",
                     part_of_day=part_of_day,
                     subtopic=subtopic_competition,
                     motive=motive_name,
                     modality=modality,
+                    group=car_possession_group,
+                    index=DataKey.zone_index(num_zones),
                 )
-                competitions.write_xlsx(general_totals_transpose, key, header=header)
+                competitions.write_csv(general_totals_transpose, key, header=header)
 
                 key = DataKey(
-                    id="Ontpl_concproduct",
+                    id=f"{competition_filename_suffix}_concproduct",
                     part_of_day=part_of_day,
                     subtopic=subtopic_competition,
                     motive=motive_name,
                     modality=modality,
+                    group=car_possession_group,
+                    index=DataKey.zone_index(num_zones),
                 )
-                competitions.write_xlsx(general_matrix_product, key, header=header)
+                competitions.write_csv(general_matrix_product, key, header=header)
 
     return competitions

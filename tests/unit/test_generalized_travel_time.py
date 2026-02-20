@@ -59,7 +59,7 @@ def setup_generalized_travel_time_input(monkeypatch, gtt):
 
     def fake_skims_source(_skims_dir):
         class _Reader:
-            def read(self, id: str, dagdeel: str, type_caster=float, default=None):
+            def read(self, id: str, dagdeel: str, type_caster=float, default=None, has_index_column=False):
                 return np.array(skims_data[(id, dagdeel)], dtype=type_caster)
 
         return _Reader()
@@ -73,7 +73,7 @@ def setup_generalized_travel_time_input(monkeypatch, gtt):
         ]
     )
 
-    def fake_read_csv_from_config(config, key: str, id: str, type_caster=float):
+    def fake_read_csv_from_config(config, key: str, id: str, type_caster=float, has_index_column=False):
         # Only used to infer the number of zones when parking costs are disabled.
         if key == "skims" and id == "parkeerzoektijden_bestand":
             return np.zeros(3)
@@ -286,7 +286,7 @@ def test_generalized_travel_time_includes_additional_and_parking_costs(monkeypat
     parking_costs = np.array([100.0, 300.0, 500.0])
     additional_costs = np.array([[0.0, 50.0, 25.0], [100.0, 0.0, 75.0], [60.0, 80.0, 90.0]])
 
-    def fake_read_csv_from_config(config, key: str, id: str, type_caster=float):
+    def fake_read_csv_from_config(config, key: str, id: str, type_caster=float, has_index_column=False):
         if key == "skims" and id == "parkeerzoektijden_bestand":
             return np.zeros(2)
         if key == "geavanceerd" and id == "parkeerkosten":
