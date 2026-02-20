@@ -193,7 +193,7 @@ The code uses the following income classes:
 - medium-high
 - high
 
-The groups are there to differentiate differentiate slices of the population with different modalities at their disposal and with different preferences.\
+The groups are there to differentiate slices of the population with different modalities at their disposal and with different preferences.\
 The code uses the following groups:
 | Group | Description |
 |---|---|

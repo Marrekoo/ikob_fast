@@ -1,7 +1,7 @@
 # Output
 
 IKOB produces a directory containing the results of its computation. This document explains the structure.
-Note that the many of the results are still in dutch.
+Note that many of the results are still in dutch.
 
 ## Directory structure
 
@@ -140,7 +140,7 @@ reference
             | Split by urbanization scenario (verstedelijkingsscenario in config)
 ```
 
-When the ikob code is ran for multiple 'time of day' settings, multiple group settings (alle groepen / alleen autobezitters) and multiple [motieven](./README.md#motieven), the results can all be contained in a single output directory with many splits to specify the context of the results. Below is an example output directory with motives 'werk' and 'school', groups 'alle groepen' and 'alleen autobezitters' and times of day 'ochtendspits' and 'restdag'.
+When the ikob code is run for multiple 'time of day' settings, multiple group settings (alle groepen / alleen autobezitters) and multiple [motieven](./README.md#motieven), the results can all be contained in a single output directory with many splits to specify the context of the results. Below is an example output directory with motives 'werk' and 'school', groups 'alle groepen' and 'alleen autobezitters' and times of day 'ochtendspits' and 'restdag'.
 
 ```
 big_example
@@ -285,7 +285,7 @@ The file name and file path then indicate the:
 
 to which the weights apply.
 
-The results for ICE and electric vehicles are in subdirectories, but otherwise the the same.
+The results for ICE and electric vehicles are in subdirectories, but otherwise the same.
 
 ### basis/\<motive\>/gewichten/combinaties/\<time-of-day\>
 
@@ -368,7 +368,7 @@ The file structure of this directory is the same as the ['bestemmingen' (destina
 Same structure as [resultaten/\<motive\>/\<groups\>/bestemmingen/\<time-of-day\>](#resultatenmotiveconcurrentiebestemmingentime-of-day). Ontpl_totaal_ and Ontpl_totaalproduct_ are called Ontpl_conc_ and Ontpl_concproduct_.
 
 Contains results on competition for destinations by the traveling population. A low value indicates that a zone is at a disadvantage compared to other zones in reaching destinations.
-Uses the same prefix as [resultaten/\<motive\>/\<groups\>/bestemmingen/\<time-of-day\>](#resultatenmotiveconcurrentiebestemmingentime-of-day) to indicate that this competition is on destination and effects the 'ontplooiing' (development) of citizens.
+Uses the same prefix as [resultaten/\<motive\>/\<groups\>/bestemmingen/\<time-of-day\>](#resultatenmotiveconcurrentiebestemmingentime-of-day) to indicate that this competition is on destination and affects the 'ontplooiing' (development) of citizens.
 
 
 ### resultaten/\<motive\>/\<groups\>/concurrentie/inwoners/\<time-of-day\>
@@ -376,7 +376,7 @@ Uses the same prefix as [resultaten/\<motive\>/\<groups\>/bestemmingen/\<time-of
 Same structure as [resultaten/\<motive\>/\<groups\>/inwoners/\<time-of-day\>](#resultatenmotivegroupsinwonerstime-of-day). Pot_totaal_ and Pot_totaalproduct_ are called Pot_conc_ and Pot_concproduct_.
 
 Contains results on competition for the traveling population by destinations. A low value indicates that a zone is at a disadvantage compared to other zones in reaching the traveling population.
-Uses the same prefix as [resultaten/\<motive\>/\<groups\>/inwoners/\<time-of-day\>](#resultatenmotivegroupsinwonerstime-of-day) to indicate that this competition is on the traveling population and effects the potential reach of a destination.
+Uses the same prefix as [resultaten/\<motive\>/\<groups\>/inwoners/\<time-of-day\>](#resultatenmotivegroupsinwonerstime-of-day) to indicate that this competition is on the traveling population and affects the potential reach of a destination.
 
 ### tussenresultaten/groepenverdeling/urbanization-scenario
 
