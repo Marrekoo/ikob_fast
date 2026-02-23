@@ -9,8 +9,10 @@ import pytest
     ],
     ids=["complicated_matrix", "diagonal_matrix"],
 )
-def potential_companies_setup(request, monkeypatch, segs_capture):
-    """Common setup for potential companies tests."""
+def reachable_population_setup(request, monkeypatch, segs_capture):
+    """Common setup for reachable population tests.
+
+    The setup regards reachable working population by employers"""
     import ikob.reachable_population as pc
 
     pod = "Restdag"
@@ -105,7 +107,7 @@ def potential_companies_setup(request, monkeypatch, segs_capture):
     }
 
 
-# As defined in potential_companies
+# As defined in reachable_population
 modalities = ["Fiets", "Auto", "OV", "Auto_Fiets", "OV_Fiets", "Auto_OV", "Auto_OV_Fiets"]
 
 
@@ -113,15 +115,15 @@ modalities = ["Fiets", "Auto", "OV", "Auto_Fiets", "OV_Fiets", "Auto_OV", "Auto_
 @pytest.mark.parametrize(
     ("income_group", "income_index"), (("laag", 0), ("middellaag", 1), ("middelhoog", 2), ("hoog", 3))
 )
-def test_potential_companies_totals(modality, income_group, income_index, potential_companies_setup):
+def test_reachable_population_totals(modality, income_group, income_index, reachable_population_setup):
     """Reachable citizens (potential workforce) totals are independent of job counts and distribution over groups."""
     from ikob.datasource import DataKey
 
-    origins = potential_companies_setup["origins"]
-    pod = potential_companies_setup["pod"]
-    motive = potential_companies_setup["motive"]
-    working_pop_income = potential_companies_setup["working_pop_income"]
-    weight_matrix = potential_companies_setup["weight_matrix"]
+    origins = reachable_population_setup["origins"]
+    pod = reachable_population_setup["pod"]
+    motive = reachable_population_setup["motive"]
+    working_pop_income = reachable_population_setup["working_pop_income"]
+    weight_matrix = reachable_population_setup["weight_matrix"]
 
     key = DataKey(
         "Totaal",
@@ -137,13 +139,13 @@ def test_potential_companies_totals(modality, income_group, income_index, potent
 
 
 @pytest.mark.parametrize("modality", modalities)
-def test_potential_companies_pot_totaal(modality, potential_companies_setup):
+def test_reachable_population_pot_totaal(modality, reachable_population_setup):
     """Pot_totaal csv output shows reachability by income group, independent of distribution over groups."""
 
-    csv_writes = potential_companies_setup["csv_writes"]
-    working_pop_income = potential_companies_setup["working_pop_income"]
-    jobs_income = potential_companies_setup["jobs_income"]
-    weight_matrix = potential_companies_setup["weight_matrix"]
+    csv_writes = reachable_population_setup["csv_writes"]
+    working_pop_income = reachable_population_setup["working_pop_income"]
+    jobs_income = reachable_population_setup["jobs_income"]
+    weight_matrix = reachable_population_setup["weight_matrix"]
 
     # Test Pot_totaal csv write (per modality, showing reachability by income group)
     pot_totaal_writes = [w for w in csv_writes if w["key"].id == "Pot_totaal" and w["key"].modality == modality]

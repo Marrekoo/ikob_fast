@@ -9,8 +9,10 @@ import pytest
     ],
     ids=["complicated_matrix", "diagonal_matrix"],
 )
-def employment_opportunities_setup(request, monkeypatch, segs_capture):
-    """Common setup for employment opportunities tests."""
+def reachable_destinations_setup(request, monkeypatch, segs_capture):
+    """Common setup for employment opportunities tests.
+
+    The setup regards reachable jobs by the working population"""
     import ikob.reachable_destinations as reachable_destinations
 
     pod = "Restdag"
@@ -108,7 +110,7 @@ def employment_opportunities_setup(request, monkeypatch, segs_capture):
     }
 
 
-# As defined in employment_opportunities
+# As defined in reachable_destinations
 modalities = ["Fiets", "Auto", "OV", "Auto_Fiets", "OV_Fiets", "Auto_OV", "Auto_OV_Fiets"]
 
 
@@ -116,15 +118,15 @@ modalities = ["Fiets", "Auto", "OV", "Auto_Fiets", "OV_Fiets", "Auto_OV", "Auto_
 @pytest.mark.parametrize(
     ("income_group", "income_index"), (("laag", 0), ("middellaag", 1), ("middelhoog", 2), ("hoog", 3))
 )
-def test_employment_opportunities_totals(modality, income_group, income_index, employment_opportunities_setup):
+def test_reachable_destinations_totals(modality, income_group, income_index, reachable_destinations_setup):
     """Reachable employment opportunities totals are independent of working population size and distribution over groups."""
     from ikob.datasource import DataKey
 
-    potencies = employment_opportunities_setup["potencies"]
-    pod = employment_opportunities_setup["pod"]
-    motive = employment_opportunities_setup["motive"]
-    jobs_income = employment_opportunities_setup["jobs_income"]
-    weight_matrix = employment_opportunities_setup["weight_matrix"]
+    potencies = reachable_destinations_setup["potencies"]
+    pod = reachable_destinations_setup["pod"]
+    motive = reachable_destinations_setup["motive"]
+    jobs_income = reachable_destinations_setup["jobs_income"]
+    weight_matrix = reachable_destinations_setup["weight_matrix"]
 
     key = DataKey(
         "Totaal",
@@ -142,13 +144,13 @@ def test_employment_opportunities_totals(modality, income_group, income_index, e
 
 
 @pytest.mark.parametrize("modality", modalities)
-def test_employment_opportunities_ontpl_totaal(modality, employment_opportunities_setup):
+def test_reachable_destinations_ontpl_totaal(modality, reachable_destinations_setup):
     """Ontpl_totaal csv output shows reachability by income group, independent of distribution over groups."""
 
-    csv_writes = employment_opportunities_setup["csv_writes"]
-    working_pop_income = employment_opportunities_setup["working_pop_income"]
-    jobs_income = employment_opportunities_setup["jobs_income"]
-    weight_matrix = employment_opportunities_setup["weight_matrix"]
+    csv_writes = reachable_destinations_setup["csv_writes"]
+    working_pop_income = reachable_destinations_setup["working_pop_income"]
+    jobs_income = reachable_destinations_setup["jobs_income"]
+    weight_matrix = reachable_destinations_setup["weight_matrix"]
 
     # Test Ontpl_totaal csv write (per modality, showing reachability by income group)
     ontpl_totaal_writes = [w for w in csv_writes if w["key"].id == "Ontpl_totaal" and w["key"].modality == modality]
