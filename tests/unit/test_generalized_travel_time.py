@@ -3,7 +3,7 @@ import pytest
 
 
 def test_costs_public_transport_pricecap_and_starting_rate():
-    from ikob.generalized_travel_time import costs_public_transport
+    from ikob.utils import costs_public_transport
 
     # Prepare
     distance = np.array(
@@ -166,7 +166,7 @@ def test_generalized_travel_time_fiets(monkeypatch):
 def test_generalized_travel_time_public_transport(monkeypatch):
     import ikob.generalized_travel_time as gtt
     from ikob.datasource import DataKey
-    from ikob.generalized_travel_time import costs_public_transport
+    from ikob.utils import costs_public_transport
 
     config, pod, regime, motive, income, _, _, _, _, pt_time, pt_dist, _, tvom = setup_generalized_travel_time_input(
         monkeypatch, gtt

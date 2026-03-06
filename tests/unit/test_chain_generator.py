@@ -32,8 +32,11 @@ def test_single_hub_basic():
     factor = 2.0
     var_car_rate = 0.05
     road_pricing = 0.01
-    pt_km_price = 0.10
     bike_cost_euro_per_km = 0.02
+
+    # Pre-compute PT cost matrix (simple: no starting rate, no pricecap)
+    pt_km_price = 0.10
+    pt_cost = pt_dist * pt_km_price
 
     result_bike, result_ride = _compute_chain_travel_time(
         hubs,
@@ -42,11 +45,10 @@ def test_single_hub_basic():
         bike_time,
         bike_dist,
         pt_time,
-        pt_dist,
+        pt_cost,
         factor,
         var_car_rate,
         road_pricing,
-        pt_km_price,
         bike_cost_euro_per_km,
     )
 
@@ -64,9 +66,12 @@ def test_single_hub_basic():
     )
     expected_ride = (
         car_leg[:, np.newaxis]
-        + pt_time[zone_with_hub, :][np.newaxis, :]
+        + np.where(
+            pt_time[zone_with_hub, :] > 0.5,
+            pt_time[zone_with_hub, :] + factor * pt_cost[zone_with_hub, :] * 1,  # pay_for_pt=1
+            9999,
+        )[np.newaxis, :]
         + 5  # pt_transfer
-        + factor * pt_dist[zone_with_hub, :][np.newaxis, :] * pt_km_price * 1  # pay_for_pt=1
         + factor * hub_cost
     )
 
@@ -87,6 +92,8 @@ def test_minimum_across_hubs():
         pay_for_pt=[1, 1],
     )
 
+    pt_cost = pt_dist * 0.08
+
     result_bike, result_ride = _compute_chain_travel_time(
         hubs,
         car_time,
@@ -94,11 +101,10 @@ def test_minimum_across_hubs():
         bike_time,
         bike_dist,
         pt_time,
-        pt_dist,
+        pt_cost,
         factor=1.5,
         var_car_rate=0.04,
         road_pricing=0.02,
-        pt_km_price=0.08,
         bike_cost_euro_per_km=0.02,
     )
 
@@ -118,11 +124,10 @@ def test_minimum_across_hubs():
             bike_time,
             bike_dist,
             pt_time,
-            pt_dist,
+            pt_cost,
             factor=1.5,
             var_car_rate=0.04,
             road_pricing=0.02,
-            pt_km_price=0.08,
             bike_cost_euro_per_km=0.02,
         )
         assert np.all(result_bike <= sb + 1e-10)
@@ -144,11 +149,13 @@ def _make_config():
             "Kosten auto fossiele brandstof": {"variabele kosten": 5, "kmheffing": 1},
             "Kosten elektrische auto": {"variabele kosten": 3, "kmheffing": 1},
             "OV kosten": {"kmkosten": 10, "starttarief": 100},
+            "OV kostenbestand": {"gebruiken": False},
+            "pricecap": {"gebruiken": False, "getal": 0},
             "bike_cost_ct_per_km": 2,
             "dagsoort": ["restdag"],
         },
         "TVOM": {
-            "werk": {"laag": 1.0, "middellaag": 1.5, "middelhoog": 2.0, "hoog": 2.5},
+            "werk": {"laag": 0.9, "middellaag": 1.5, "middelhoog": 2.0, "hoog": 2.5},
             "overig": {"laag": 0.8, "middellaag": 1.2, "middelhoog": 1.6, "hoog": 2.0},
         },
         "ketens": {

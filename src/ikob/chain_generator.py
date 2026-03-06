@@ -5,6 +5,7 @@ import numpy.typing as npt
 
 from ikob.configuration_definition import TvomType
 from ikob.datasource import DataKey, DataSource, SkimsSource, read_csv_from_config
+from ikob.utils import costs_public_transport
 
 logger = logging.getLogger(__name__)
 
@@ -26,11 +27,10 @@ def _compute_chain_travel_time(
     bike_time: npt.NDArray,
     bike_dist: npt.NDArray,
     pt_time: npt.NDArray,
-    pt_dist: npt.NDArray,
+    pt_cost: npt.NDArray,
     factor: float,
     var_car_rate: float,
     road_pricing: float,
-    pt_km_price: float,
     bike_cost_euro_per_km: float,
 ) -> tuple[npt.NDArray, npt.NDArray]:
     """Compute Park+Bike and Park+Ride generalized travel time skims.
@@ -40,7 +40,6 @@ def _compute_chain_travel_time(
 
     """
     num_zones = len(car_time)
-    # Initialize with a high value
     result_bike = np.full((num_zones, num_zones), np.inf)
     result_ride = np.full((num_zones, num_zones), np.inf)
 
@@ -52,10 +51,9 @@ def _compute_chain_travel_time(
         change_time_pt = hubs.pt_transfer_times[hub_idx]
         pay_for_pt = hubs.pay_for_pt[hub_idx]
 
-        # Car leg: origin -> hub (shape: n)
         car_leg = car_time[:, zone_idx] + factor * (var_car_rate + road_pricing) * car_dist[:, zone_idx]
 
-        # P+Bike: car_leg + bike from hub to destination + bike variable cost + transfer + hub cost
+        # P+Bike: origin -> hub by car, hub -> destination by bike
         p_bike = (
             car_leg[:, np.newaxis]
             + bike_time[zone_idx, :][np.newaxis, :]
@@ -64,14 +62,13 @@ def _compute_chain_travel_time(
             + factor * hub_cost
         )
 
-        # P+R: car_leg + PT from hub to destination + transfer + PT cost + hub cost
-        p_ride = (
-            car_leg[:, np.newaxis]
-            + pt_time[zone_idx, :][np.newaxis, :]
-            + change_time_pt
-            + factor * pt_dist[zone_idx, :][np.newaxis, :] * pt_km_price * pay_for_pt
-            + factor * hub_cost
+        # P+R: origin -> hub by car, hub -> destination by public transport
+        pt_leg = np.where(
+            pt_time[zone_idx, :] > 0.5,
+            pt_time[zone_idx, :] + factor * pt_cost[zone_idx, :] * pay_for_pt,
+            9999,
         )
+        p_ride = car_leg[:, np.newaxis] + pt_leg[np.newaxis, :] + change_time_pt + factor * hub_cost
 
         result_bike = np.minimum(result_bike, p_bike)
         result_ride = np.minimum(result_ride, p_ride)
@@ -119,6 +116,10 @@ def chain_generator(generalized_travel_time: DataSource, config: dict):
     var_electric = skims_config["Kosten elektrische auto"]["variabele kosten"] / 100
     road_pricing_electric = skims_config["Kosten elektrische auto"]["kmheffing"] / 100
     pt_km_price = skims_config["OV kosten"]["kmkosten"] / 100
+    starting_rate = skims_config["OV kosten"]["starttarief"] / 100
+    pt_cost_file = skims_config["OV kostenbestand"]["gebruiken"]
+    pricecap = skims_config["pricecap"]["gebruiken"]
+    pricecap_value = skims_config["pricecap"]["getal"]
     bike_cost_euro_per_km = skims_config["bike_cost_ct_per_km"] / 100
     part_of_day = skims_config["dagsoort"]
 
@@ -137,7 +138,12 @@ def chain_generator(generalized_travel_time: DataSource, config: dict):
         default_speed_km_p_minute = 15 / 60
         bike_dist = skims_reader.read("Fiets_Afstand", pod, default=(bike_time * default_speed_km_p_minute))
         pt_time = skims_reader.read("OV_Tijd", pod)
-        pt_dist = skims_reader.read("OV_Afstand", pod)
+
+        if pt_cost_file:
+            pt_cost = skims_reader.read("OV_Kosten", pod)
+        else:
+            pt_dist = skims_reader.read("OV_Afstand", pod)
+            pt_cost = costs_public_transport(pt_dist, pt_km_price, starting_rate, pricecap, pricecap_value)
 
         for income_level in income_levels:
             factor = tvom.get(income_level)
@@ -157,11 +163,10 @@ def chain_generator(generalized_travel_time: DataSource, config: dict):
                     bike_time=bike_time,
                     bike_dist=bike_dist,
                     pt_time=pt_time,
-                    pt_dist=pt_dist,
+                    pt_cost=pt_cost,
                     factor=factor,
                     var_car_rate=var_car_rate,
                     road_pricing=road_pricing,
-                    pt_km_price=pt_km_price,
                     bike_cost_euro_per_km=bike_cost_euro_per_km,
                 )
 

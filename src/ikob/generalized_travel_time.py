@@ -1,5 +1,4 @@
 import logging
-import pathlib
 
 import numpy as np
 
@@ -17,16 +16,6 @@ from ikob.datasource import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-def costs_public_transport(distance, pt_km_price, starting_rate, pricecap, pricecap_value):
-    distance = np.where(distance < 0, 0, distance)
-    distance = starting_rate + distance * pt_km_price
-
-    if pricecap:
-        np.clip(distance, None, pricecap_value, out=distance)
-
-    return distance
 
 
 def generalized_travel_time(config) -> DataSource:
@@ -118,7 +107,7 @@ def generalized_travel_time(config) -> DataSource:
             pt_distance_matrix = skims_reader.read("OV_Afstand", pod)
             n = len(pt_time_matrix)
             pt_cost_matrix = np.zeros((n, n))
-            pt_cost_matrix = costs_public_transport(
+            pt_cost_matrix = utils.costs_public_transport(
                 pt_distance_matrix, pt_km_price, starting_rate, pricecap, pricecap_value
             )
 
