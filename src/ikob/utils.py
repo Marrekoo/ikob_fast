@@ -78,25 +78,6 @@ def write_csv(matrix, filenaam, index=CsvIndex(), header=[]):
     np.savetxt(filenaam, matrix, fmt=fmt, delimiter=delim, header=header, comments="")
 
 
-def compute_car_gtt(
-    car_time: npt.NDArray,
-    car_dist: npt.NDArray,
-    var_rate: float,
-    road_pricing: float,
-    tvom_factor: float,
-    additional_costs_euro: npt.NDArray,
-    parking_times_array: npt.NDArray,
-    parking_costs_array_euro: npt.NDArray,
-):
-    parking_time_matrix = parking_times_array[:, 1][:, np.newaxis] + parking_times_array[:, 2][np.newaxis, :]
-    return (
-        car_time
-        + parking_time_matrix
-        + tvom_factor
-        * ((var_rate + road_pricing) * car_dist + additional_costs_euro / 100 + parking_costs_array_euro / 100)
-    )
-
-
 def costs_public_transport(distance, pt_km_price, starting_rate, pricecap, pricecap_value):
     distance = np.where(distance < 0, 0, distance)
     distance = starting_rate + distance * pt_km_price
@@ -193,3 +174,40 @@ def combined_group(mod, gr):
     elif "Fiets" in mod:
         string = string + "_Fiets"
     return string
+
+
+"""
+Some functions that compute general travel time to avoid copying this logic
+"""
+
+
+def compute_bike_gtt(
+    bike_time_matrix: npt.NDArray,
+    bike_distance_matrix: npt.NDArray,
+    bike_cost_euro_per_km: float,
+    tvom_min_per_euro: float,
+):
+    return bike_time_matrix + tvom_min_per_euro * bike_distance_matrix * bike_cost_euro_per_km
+
+
+def compute_pt_gtt(pt_time_matrix: npt.NDArray, pt_cost_matrix: npt.NDArray, factor: float):
+    return np.where(pt_time_matrix > 0.5, pt_time_matrix + factor * pt_cost_matrix, 9999)
+
+
+def compute_car_gtt(
+    car_time: npt.NDArray,
+    car_dist: npt.NDArray,
+    var_rate: float,
+    road_pricing: float,
+    tvom_factor: float,
+    additional_costs_euro: npt.NDArray,
+    parking_times_array: npt.NDArray,
+    parking_costs_array_euro: npt.NDArray,
+):
+    parking_time_matrix = parking_times_array[:, 1][:, np.newaxis] + parking_times_array[:, 2][np.newaxis, :]
+    return (
+        car_time
+        + parking_time_matrix
+        + tvom_factor
+        * ((var_rate + road_pricing) * car_dist + additional_costs_euro / 100 + parking_costs_array_euro / 100)
+    )

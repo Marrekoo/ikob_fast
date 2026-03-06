@@ -73,19 +73,11 @@ def compute_chain_travel_time(
         )
 
         # P+Bike: origin -> hub by car, hub -> destination by bike
-        p_bike = (
-            car_leg[:, np.newaxis]
-            + bike_time[zone_idx, :][np.newaxis, :]
-            + change_time_bike
-            + factor * bike_cost_euro_per_km * bike_dist[zone_idx, :][np.newaxis, :]
-        )
+        bike_leg = (utils.compute_bike_gtt(bike_time, bike_dist, bike_cost_euro_per_km, factor))[zone_idx, :]
+        p_bike = car_leg[:, np.newaxis] + bike_leg[np.newaxis, :] + change_time_bike
 
         # P+R: origin -> hub by car, hub -> destination by public transport
-        pt_leg = np.where(
-            pt_time[zone_idx, :] > 0.5,
-            pt_time[zone_idx, :] + factor * pt_cost[zone_idx, :] * pay_for_pt,
-            9999,
-        )
+        pt_leg = utils.compute_pt_gtt(pt_time, pt_cost * pay_for_pt, factor)[zone_idx, :]
         p_ride = car_leg[:, np.newaxis] + pt_leg[np.newaxis, :] + change_time_pt
 
         result_bike = np.minimum(result_bike, p_bike)

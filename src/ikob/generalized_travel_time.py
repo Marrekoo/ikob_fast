@@ -116,7 +116,10 @@ def generalized_travel_time(config) -> DataSource:
         # Bike generalized travel time:
         for income_level in income_levels:
             tvom_min_per_euro = tvom.get(income_level)
-            gtr_skim = bike_time_matrix + tvom_min_per_euro * bike_distance_matrix * bike_cost_euro_per_km
+
+            gtr_skim = utils.compute_bike_gtt(
+                bike_time_matrix, bike_distance_matrix, bike_cost_euro_per_km, tvom_min_per_euro
+            )
 
             key = DataKey(
                 id="Fiets",
@@ -187,7 +190,7 @@ def generalized_travel_time(config) -> DataSource:
             # Then PT, pt costs are (optionally) computed from travel times and skims_config["OV kosten"]
             # This does tot strictly follow the documentation in IKOB-algorithm.pdf
             factor = tvom.get(income_level)
-            gtr_skim = np.where(pt_time_matrix > 0.5, pt_time_matrix + factor * pt_cost_matrix, 9999)
+            gtr_skim = utils.compute_pt_gtt(pt_time_matrix, pt_cost_matrix, factor)
             key = DataKey(
                 id="OV",
                 part_of_day=pod,
