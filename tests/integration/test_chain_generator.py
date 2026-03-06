@@ -111,6 +111,7 @@ def test_chain_matches_generalized_travel_time_legs(monkeypatch, hub_zone, incom
     monkeypatch.setattr(gtt, "SegsSource", lambda _config: None)
     monkeypatch.setattr(gtt, "read_parking_times", lambda _config: parking_times)
     monkeypatch.setattr(gtt, "read_csv_from_config", fake_read_csv)
+    monkeypatch.setattr(cg, "read_parking_times", lambda _config: np.zeros((num_zones, 3)))
 
     config = _make_config()
 

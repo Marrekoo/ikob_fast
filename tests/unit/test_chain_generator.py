@@ -1,6 +1,6 @@
 import numpy as np
 
-from ikob.chain_generator import Hubs, _compute_chain_travel_time, chain_generator
+from ikob.chain_generator import Hubs, chain_generator, compute_chain_travel_time
 from ikob.datasource import DataKey, DataSource, DataType
 
 
@@ -38,7 +38,7 @@ def test_single_hub_basic():
     pt_km_price = 0.10
     pt_cost = pt_dist * pt_km_price
 
-    result_bike, result_ride = _compute_chain_travel_time(
+    result_bike, result_ride = compute_chain_travel_time(
         hubs,
         car_time,
         car_dist,
@@ -50,6 +50,8 @@ def test_single_hub_basic():
         var_car_rate,
         road_pricing,
         bike_cost_euro_per_km,
+        additional_costs=np.zeros((n, n)),
+        parking_times=np.zeros((n, 3)),
     )
 
     # With just a single hub, the resulting times should be equal to taking the car to the hub, and then either the bike or pt
@@ -94,7 +96,7 @@ def test_minimum_across_hubs():
 
     pt_cost = pt_dist * 0.08
 
-    result_bike, result_ride = _compute_chain_travel_time(
+    result_bike, result_ride = compute_chain_travel_time(
         hubs,
         car_time,
         car_dist,
@@ -106,6 +108,8 @@ def test_minimum_across_hubs():
         var_car_rate=0.04,
         road_pricing=0.02,
         bike_cost_euro_per_km=0.02,
+        additional_costs=np.zeros((n, n)),
+        parking_times=np.zeros((n, 3)),
     )
 
     # Result should be <= single-hub results
@@ -117,7 +121,7 @@ def test_minimum_across_hubs():
             bike_transfer=[2 if zone_col == 0 else 3],
             pay_for_pt=[1],
         )
-        sb, sr = _compute_chain_travel_time(
+        sb, sr = compute_chain_travel_time(
             single,
             car_time,
             car_dist,
@@ -129,6 +133,8 @@ def test_minimum_across_hubs():
             var_car_rate=0.04,
             road_pricing=0.02,
             bike_cost_euro_per_km=0.02,
+            additional_costs=np.zeros((n, n)),
+            parking_times=np.zeros((n, 3)),
         )
         assert np.all(result_bike <= sb + 1e-10)
         assert np.all(result_ride <= sr + 1e-10)
@@ -153,6 +159,7 @@ def _make_config():
             "pricecap": {"gebruiken": False, "getal": 0},
             "bike_cost_ct_per_km": 2,
             "dagsoort": ["restdag"],
+            "parkeerzoektijden_bestand": "unused.csv",
         },
         "TVOM": {
             "werk": {"laag": 0.9, "middellaag": 1.5, "middelhoog": 2.0, "hoog": 2.5},
@@ -166,6 +173,10 @@ def _make_config():
             "bestemmingslijst": {
                 "gebruiken": False,
             },
+        },
+        "geavanceerd": {
+            "additionele_kosten": {"gebruiken": False, "bestand": ""},
+            "parkeerkosten": {"gebruiken": False, "bestand": ""},
         },
         "__filename__": "tmp",
     }
@@ -207,6 +218,7 @@ def test_chain_generator(monkeypatch):
 
     monkeypatch.setattr(cg, "SkimsSource", fake_skims_source)
     monkeypatch.setattr(cg, "read_csv_from_config", fake_read_csv_from_config)
+    monkeypatch.setattr(cg, "read_parking_times", lambda _config: np.zeros((num_zones, 3)))
 
     config = _make_config()
 

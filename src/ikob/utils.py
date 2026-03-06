@@ -3,6 +3,7 @@ import pathlib
 from dataclasses import dataclass, field
 
 import numpy as np
+import numpy.typing as npt
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +76,25 @@ def write_csv(matrix, filenaam, index=CsvIndex(), header=[]):
     delim = ","
     header = delim.join(header)
     np.savetxt(filenaam, matrix, fmt=fmt, delimiter=delim, header=header, comments="")
+
+
+def compute_car_gtt(
+    car_time: npt.NDArray,
+    car_dist: npt.NDArray,
+    var_rate: float,
+    road_pricing: float,
+    tvom_factor: float,
+    additional_costs_euro: npt.NDArray,
+    parking_times_array: npt.NDArray,
+    parking_costs_array_euro: npt.NDArray,
+):
+    parking_time_matrix = parking_times_array[:, 1][:, np.newaxis] + parking_times_array[:, 2][np.newaxis, :]
+    return (
+        car_time
+        + parking_time_matrix
+        + tvom_factor
+        * ((var_rate + road_pricing) * car_dist + additional_costs_euro / 100 + parking_costs_array_euro / 100)
+    )
 
 
 def costs_public_transport(distance, pt_km_price, starting_rate, pricecap, pricecap_value):

@@ -3,8 +3,9 @@ import logging
 import numpy as np
 import numpy.typing as npt
 
+from ikob import utils
 from ikob.configuration_definition import TvomType
-from ikob.datasource import DataKey, DataSource, SkimsSource, read_csv_from_config
+from ikob.datasource import DataKey, DataSource, SkimsSource, read_csv_from_config, read_parking_times
 from ikob.utils import costs_public_transport
 
 logger = logging.getLogger(__name__)
@@ -20,7 +21,7 @@ class Hubs:
         self.num_hubs: int = len(hubs)
 
 
-def _compute_chain_travel_time(
+def compute_chain_travel_time(
     hubs: Hubs,
     car_time: npt.NDArray,
     car_dist: npt.NDArray,
@@ -32,6 +33,8 @@ def _compute_chain_travel_time(
     var_car_rate: float,
     road_pricing: float,
     bike_cost_euro_per_km: float,
+    additional_costs: npt.NDArray,
+    parking_times: npt.NDArray,
 ) -> tuple[npt.NDArray, npt.NDArray]:
     """Compute Park+Bike and Park+Ride generalized travel time skims.
 
@@ -43,6 +46,10 @@ def _compute_chain_travel_time(
     result_bike = np.full((num_zones, num_zones), np.inf)
     result_ride = np.full((num_zones, num_zones), np.inf)
 
+    # Hubs have their own transfer time that includes the parking time
+    hub_parking_times = parking_times
+    hub_parking_times[:, 2] = np.zeros(len(hub_parking_times))
+
     for hub_idx in range(hubs.num_hubs):
         # ASSUMPTION! Zones are zero indexed. In earlier discussions and old code both zero and one based indexing has been used. We should discuss.
         zone_idx = int(hubs.zones[hub_idx])
@@ -51,7 +58,19 @@ def _compute_chain_travel_time(
         change_time_pt = hubs.pt_transfer_times[hub_idx]
         pay_for_pt = hubs.pay_for_pt[hub_idx]
 
-        car_leg = car_time[:, zone_idx] + factor * (var_car_rate + road_pricing) * car_dist[:, zone_idx]
+        car_leg = (
+            utils.compute_car_gtt(
+                car_time=car_time,
+                car_dist=car_dist,
+                var_rate=var_car_rate,
+                road_pricing=road_pricing,
+                tvom_factor=factor,
+                additional_costs_euro=additional_costs,
+                parking_costs_array_euro=np.zeros(len(additional_costs)),  # parking costs are in the hub_cost
+                parking_times_array=hub_parking_times,
+            )[:, zone_idx]
+            + hub_cost * factor
+        )
 
         # P+Bike: origin -> hub by car, hub -> destination by bike
         p_bike = (
@@ -59,7 +78,6 @@ def _compute_chain_travel_time(
             + bike_time[zone_idx, :][np.newaxis, :]
             + change_time_bike
             + factor * bike_cost_euro_per_km * bike_dist[zone_idx, :][np.newaxis, :]
-            + factor * hub_cost
         )
 
         # P+R: origin -> hub by car, hub -> destination by public transport
@@ -68,7 +86,7 @@ def _compute_chain_travel_time(
             pt_time[zone_idx, :] + factor * pt_cost[zone_idx, :] * pay_for_pt,
             9999,
         )
-        p_ride = car_leg[:, np.newaxis] + pt_leg[np.newaxis, :] + change_time_pt + factor * hub_cost
+        p_ride = car_leg[:, np.newaxis] + pt_leg[np.newaxis, :] + change_time_pt
 
         result_bike = np.minimum(result_bike, p_bike)
         result_ride = np.minimum(result_ride, p_ride)
@@ -131,6 +149,12 @@ def chain_generator(generalized_travel_time: DataSource, config: dict):
     skims_dir = config["project"]["paden"]["skims_directory"]
     skims_reader = SkimsSource(skims_dir)
 
+    parking_times = read_parking_times(config)
+    if config["geavanceerd"]["additionele_kosten"]["gebruiken"]:
+        additional_cost_matrix = read_csv_from_config(config, key="geavanceerd", id="additionele_kosten")
+    else:
+        additional_cost_matrix = np.zeros((len(parking_times), len(parking_times)))
+
     for pod in part_of_day:
         car_time = skims_reader.read("Auto_Tijd", pod)
         car_dist = skims_reader.read("Auto_Afstand", pod)
@@ -156,7 +180,7 @@ def chain_generator(generalized_travel_time: DataSource, config: dict):
                     var_car_rate = var_electric
                     road_pricing = road_pricing_electric
 
-                result_bike, result_ride = _compute_chain_travel_time(
+                result_bike, result_ride = compute_chain_travel_time(
                     hubs=hubs,
                     car_time=car_time,
                     car_dist=car_dist,
@@ -168,6 +192,8 @@ def chain_generator(generalized_travel_time: DataSource, config: dict):
                     var_car_rate=var_car_rate,
                     road_pricing=road_pricing,
                     bike_cost_euro_per_km=bike_cost_euro_per_km,
+                    additional_costs=additional_cost_matrix,
+                    parking_times=np.array(parking_times),
                 )
 
                 key = DataKey(

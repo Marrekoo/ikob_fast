@@ -17,7 +17,7 @@ Some commonly used abbreviations / jargon:
   For example: Shops per zone, working population per zone, etc.
 - skims: Data to determine an impedance ('friction') matrix from zone to zone.  
   For example: A matrix of distances via car from zone to zone, costs per kilometer of traveling by car, etc.
-- GTR: Generalized travel time
+- GTR / GTR: Generalized travel time
 - ICE: Internal combustion engine. Also referred to using fuel_kind 'fossiel'. 
 - vk: (dutch) voorkeur / (english) preference
 - groups: See [Groups](./README.md#groups)

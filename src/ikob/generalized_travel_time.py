@@ -65,6 +65,8 @@ def generalized_travel_time(config) -> DataSource:
 
     if additional_costs:
         additional_cost_matrix = read_csv_from_config(config, key="geavanceerd", id="additionele_kosten")
+    else:
+        additional_cost_matrix = np.zeros((len(parking_times_temporary), len(parking_times_temporary)))
 
     income_levels = ["laag", "middellaag", "middelhoog", "hoog"]
     pt_km_price = pt_km_price / 100
@@ -138,19 +140,17 @@ def generalized_travel_time(config) -> DataSource:
                 else:
                     var_car_rate = var_electric
                     road_pricing = road_pricing_electric
-                for i in range(num_zones):
-                    for j in range(num_zones):
-                        total_time = car_time_matrix[i][j] + parking_times[i][1] + parking_times[j][2]
-                        if additional_costs:
-                            gtr_skim[i][j] = total_time + factor * (
-                                car_distance_matrix[i][j] * (var_car_rate + road_pricing)
-                                + additional_cost_matrix[i][j] / 100
-                                + parking_cost_array[j] / 100
-                            )
-                        else:
-                            gtr_skim[i][j] = total_time + factor * (
-                                car_distance_matrix[i][j] * (var_car_rate + road_pricing) + parking_cost_array[j] / 100
-                            )
+
+                gtr_skim = utils.compute_car_gtt(
+                    car_time=car_time_matrix,
+                    car_dist=car_distance_matrix,
+                    var_rate=var_car_rate,
+                    road_pricing=road_pricing,
+                    tvom_factor=factor,
+                    additional_costs_euro=additional_cost_matrix,
+                    parking_times_array=np.array(parking_times),
+                    parking_costs_array_euro=parking_cost_array,
+                )
                 if chains:
                     key = DataKey(
                         id=f"Pplusfiets_{fuel_kind}",
