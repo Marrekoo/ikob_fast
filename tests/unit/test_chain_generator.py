@@ -1,38 +1,226 @@
-import pathlib
-import shutil
+import numpy as np
 
-from ikob.chain_generator import chain_generator
-from tests.e2e.test_end_to_end import compare_directories
+from ikob.chain_generator import Hubs, _compute_chain_travel_time, chain_generator
+from ikob.datasource import DataKey, DataSource, DataType
 
 
-def test_chain_generator(tmpdir):
-    # Prepare
-    reference_dir = pathlib.Path("tests/chains/reference")
-    skims_dir = pathlib.Path("tests/chains/restdag")
-    result_dir = pathlib.Path(tmpdir) / "restdag"
+def _make_hubs(zones, hub_costs, pt_transfer, bike_transfer, pay_for_pt):
+    """Build a Hubs object from plain lists."""
+    data = np.column_stack([zones, hub_costs, pt_transfer, bike_transfer, pay_for_pt])
+    return Hubs(data)
 
-    # Copy skims file into temporary dir
-    shutil.copytree(skims_dir, result_dir, dirs_exist_ok=True)
 
-    hubs = [35, 40, 94, 105, 134, 153, 184, 193, 204, 249, 288]
-    name = "Masterplan_hubset"
-    transfer_time_pt = 8
-    transfer_time_bike = 5
+def _simple_matrices(n=4):
+    """Return small deterministic skim matrices for *n* zones."""
+    rng = np.random.default_rng(42)
+    car_time = rng.random((n, n)) * 30
+    car_dist = rng.random((n, n)) * 50
+    bike_time = rng.random((n, n)) * 20
+    bike_dist = rng.random((n, n)) * 15
+    pt_time = rng.random((n, n)) * 25
+    pt_dist = rng.random((n, n)) * 40
+    return car_time, car_dist, bike_time, bike_dist, pt_time, pt_dist
 
-    # Act
-    chain_generator(result_dir, name, hubs, transfer_time_pt, transfer_time_bike)
 
-    # Assert
-    # Since output files are written back to input directory, the remaining
-    # input files are removed before comparing output files with references.
-    files_to_ignore_during_comparison = [
-        "Auto_Afstand.csv",
-        "Auto_Tijd.csv",
-        "Fiets_Tijd.csv",
-        "OV_Afstand.csv",
-        "OV_Tijd.csv",
-    ]
-    for filename in files_to_ignore_during_comparison:
-        (result_dir / filename).unlink()
+def test_single_hub_basic():
+    """With one hub the result equals that hub's contribution (where closer)."""
+    n = 4
+    car_time, car_dist, bike_time, bike_dist, pt_time, pt_dist = _simple_matrices(n)
 
-    assert compare_directories(result_dir, reference_dir)
+    # Hub at zone 2 (1-indexed), modest costs
+    hubs = _make_hubs(zones=[2], hub_costs=[100], pt_transfer=[5], bike_transfer=[3], pay_for_pt=[1])
+    factor = 2.0
+    var_car_rate = 0.05
+    road_pricing = 0.01
+    pt_km_price = 0.10
+    bike_cost_euro_per_km = 0.02
+
+    result_bike, result_ride = _compute_chain_travel_time(
+        hubs,
+        car_time,
+        car_dist,
+        bike_time,
+        bike_dist,
+        pt_time,
+        pt_dist,
+        factor,
+        var_car_rate,
+        road_pricing,
+        pt_km_price,
+        bike_cost_euro_per_km,
+    )
+
+    # With just a single hub, the resulting times should be equal to taking the car to the hub, and then either the bike or pt
+    zone_with_hub = 2
+    hub_cost = 100 / 100
+    car_leg = car_time[:, zone_with_hub] + factor * (var_car_rate + road_pricing) * car_dist[:, zone_with_hub]
+
+    expected_bike = (
+        car_leg[:, np.newaxis]
+        + bike_time[zone_with_hub, :][np.newaxis, :]
+        + 3  # bike_transfer
+        + factor * bike_cost_euro_per_km * bike_dist[zone_with_hub, :][np.newaxis, :]
+        + factor * hub_cost
+    )
+    expected_ride = (
+        car_leg[:, np.newaxis]
+        + pt_time[zone_with_hub, :][np.newaxis, :]
+        + 5  # pt_transfer
+        + factor * pt_dist[zone_with_hub, :][np.newaxis, :] * pt_km_price * 1  # pay_for_pt=1
+        + factor * hub_cost
+    )
+
+    np.testing.assert_allclose(result_bike, expected_bike)
+    np.testing.assert_allclose(result_ride, expected_ride)
+
+
+def test_minimum_across_hubs():
+    """With two hubs, element-wise minimum is taken correctly."""
+    n = 4
+    car_time, car_dist, bike_time, bike_dist, pt_time, pt_dist = _simple_matrices(n)
+
+    hubs = _make_hubs(
+        zones=[1, 3],
+        hub_costs=[50, 80],
+        pt_transfer=[4, 6],
+        bike_transfer=[2, 3],
+        pay_for_pt=[1, 1],
+    )
+
+    result_bike, result_ride = _compute_chain_travel_time(
+        hubs,
+        car_time,
+        car_dist,
+        bike_time,
+        bike_dist,
+        pt_time,
+        pt_dist,
+        factor=1.5,
+        var_car_rate=0.04,
+        road_pricing=0.02,
+        pt_km_price=0.08,
+        bike_cost_euro_per_km=0.02,
+    )
+
+    # Result should be <= single-hub results
+    for zone_col in [0, 2]:  # hub zones 1 and 3 (0-indexed)
+        single = _make_hubs(
+            zones=[zone_col + 1],
+            hub_costs=[50 if zone_col == 0 else 80],
+            pt_transfer=[4 if zone_col == 0 else 6],
+            bike_transfer=[2 if zone_col == 0 else 3],
+            pay_for_pt=[1],
+        )
+        sb, sr = _compute_chain_travel_time(
+            single,
+            car_time,
+            car_dist,
+            bike_time,
+            bike_dist,
+            pt_time,
+            pt_dist,
+            factor=1.5,
+            var_car_rate=0.04,
+            road_pricing=0.02,
+            pt_km_price=0.08,
+            bike_cost_euro_per_km=0.02,
+        )
+        assert np.all(result_bike <= sb + 1e-10)
+        assert np.all(result_ride <= sr + 1e-10)
+
+
+def _make_config():
+    return {
+        "project": {
+            "beprijzingsregime": "basis",
+            "motief": {"naam": "woon-werk", "TVOM": "werk"},
+            "paden": {
+                "output_directory": "out",
+                "skims_directory": "skims",
+                "segs_directory": "segs",
+            },
+        },
+        "skims": {
+            "Kosten auto fossiele brandstof": {"variabele kosten": 5, "kmheffing": 1},
+            "Kosten elektrische auto": {"variabele kosten": 3, "kmheffing": 1},
+            "OV kosten": {"kmkosten": 10, "starttarief": 100},
+            "bike_cost_ct_per_km": 2,
+            "dagsoort": ["restdag"],
+        },
+        "TVOM": {
+            "werk": {"laag": 1.0, "middellaag": 1.5, "middelhoog": 2.0, "hoog": 2.5},
+            "overig": {"laag": 0.8, "middellaag": 1.2, "middelhoog": 1.6, "hoog": 2.0},
+        },
+        "ketens": {
+            "chains": {
+                "gebruiken": True,
+                "naam hub": "test_hubset",
+            },
+            "bestemmingslijst": {
+                "gebruiken": False,
+            },
+        },
+        "__filename__": "tmp",
+    }
+
+
+def test_chain_generator(monkeypatch):
+    """chain_generator populates the DataSource with P+Bike and P+R keys."""
+    import ikob.chain_generator as cg
+
+    num_zones = 5
+    rng = np.random.default_rng(99)
+
+    skims_data = {
+        ("Auto_Tijd", "restdag"): rng.random((num_zones, num_zones)) * 30,
+        ("Auto_Afstand", "restdag"): rng.random((num_zones, num_zones)) * 30,
+        ("Fiets_Tijd", "restdag"): rng.random((num_zones, num_zones)) * 30,
+        ("OV_Tijd", "restdag"): rng.random((num_zones, num_zones)) * 30,
+        ("OV_Afstand", "restdag"): rng.random((num_zones, num_zones)) * 30,
+    }
+
+    def fake_skims_source(_skims_dir):
+        class _Reader:
+            def read(self, id, dagdeel, type_caster=float, default=None, has_index_column=False):
+                key = (id, dagdeel)
+                if key in skims_data:
+                    return np.array(skims_data[key], dtype=type_caster)
+                if default is not None:
+                    return default
+                raise FileNotFoundError(f"Skim {id}/{dagdeel} not found, with no default.")
+
+        return _Reader()
+
+    hub_data = np.array([[2, 50, 5, 3, 1], [4, 80, 6, 4, 1]], dtype=float)
+
+    def fake_read_csv_from_config(config, key, id, type_caster=float, has_index_column=False):
+        if key == "ketens" and id == "chains":
+            return hub_data
+        raise AssertionError(f"Unexpected read_csv_from_config call: key={key!r}, id={id!r}")
+
+    monkeypatch.setattr(cg, "SkimsSource", fake_skims_source)
+    monkeypatch.setattr(cg, "read_csv_from_config", fake_read_csv_from_config)
+
+    config = _make_config()
+
+    datasource = DataSource(config, DataType.GENERALIZED_TRAVEL_TIME)
+    datasource.cache = {}
+
+    chain_generator(datasource, config)
+
+    # Expect keys for 4 income levels x 2 fuel kinds x {Pplusfiets, PplusR} = 16 keys
+    assert len(datasource.cache) == 16
+    for income in ["laag", "middellaag", "middelhoog", "hoog"]:
+        for fuel in ["fossiel", "elektrisch"]:
+            for prefix in ["Pplusfiets", "PplusR"]:
+                key = DataKey(
+                    id=f"{prefix}_{fuel}",
+                    part_of_day="restdag",
+                    income=income,
+                    hub_name="test_hubset",
+                    motive="woon-werk",
+                    regime="basis",
+                )
+                assert key in datasource.cache, f"Missing key: {key}"
+                matrix = datasource.cache[key]
+                assert matrix.shape == (num_zones, num_zones)

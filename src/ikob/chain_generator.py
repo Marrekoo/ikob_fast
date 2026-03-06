@@ -1,206 +1,186 @@
-import os
-import pathlib
+import logging
 
 import numpy as np
+import numpy.typing as npt
 
-from ikob.utils import read_csv, write_csv
+from ikob.configuration_definition import TvomType
+from ikob.datasource import DataKey, DataSource, SkimsSource, read_csv_from_config
 
-
-def ask_user_for_skims_directory():
-    """Prompt user for skims directory using a Tk filedialog window."""
-    from tkinter import Tk, filedialog
-
-    main_window_size = "10x10"
-    label = "Voer de directory waar de pure reistijdskims en afstandskims in staan"
-    initialdir = os.getcwd()
-    title = "Selecteer de directory skimsdirectory"
-
-    skims = Tk()
-    skims.geometry = main_window_size
-    skims.label = label
-    skims.directory = filedialog.askdirectory(initialdir=initialdir, title=title)
-    skims.destroy()
-    return skims.directory + "/"
+logger = logging.getLogger(__name__)
 
 
-def ask_user_for_hubs() -> list[int]:
-    """Prompt user over ``stdin`` for hubs in the hub set."""
-    hubs = []
-    prompt = "Geef de zone(s) met hub(s) één voor één aan. Als je de laatste hebt gehad, typ dan -1: "
-
-    while True:
-        response = input(prompt)
-
-        hub = int(response)
-        if hub < 0:
-            break
-
-    return hubs
+class Hubs:
+    def __init__(self, hubs: npt.NDArray):
+        self.zones = hubs[:, 0]
+        self.hub_costs_cents = hubs[:, 1]
+        self.pt_transfer_times = hubs[:, 2]
+        self.bike_transfer_times = hubs[:, 3]
+        self.pay_for_pt = hubs[:, 4]
+        self.num_hubs: int = len(hubs)
 
 
-def ask_user_for_hub_name() -> str:
-    """Prompt user over ``stdin`` for a idenfier for the hub set."""
-    prompt = "Geef de hubset een naam"
-    return input(prompt)
+def _compute_chain_travel_time(
+    hubs: Hubs,
+    car_time: npt.NDArray,
+    car_dist: npt.NDArray,
+    bike_time: npt.NDArray,
+    bike_dist: npt.NDArray,
+    pt_time: npt.NDArray,
+    pt_dist: npt.NDArray,
+    factor: float,
+    var_car_rate: float,
+    road_pricing: float,
+    pt_km_price: float,
+    bike_cost_euro_per_km: float,
+) -> tuple[npt.NDArray, npt.NDArray]:
+    """Compute Park+Bike and Park+Ride generalized travel time skims.
 
+    For each hub, vectorized over all origin-destination pairs. Returns the
+    element-wise minimum across all hubs.
 
-def ask_user_for_transfer_times() -> tuple[int, int]:
-    """Prompt user over ``stdin`` for transfer time between transport kinds."""
-    prompt = "Hoeveel overstaptijd is er op de hub tussen auto en OV?"
-    transfer_time_car_pt = int(input(prompt))
-
-    prompt = "Hoeveel overstaptijd is er op de hub tussen auto en fiets?"
-    transfer_time_car_bike = int(input(prompt))
-
-    return transfer_time_car_pt, transfer_time_car_bike
-
-
-def chain_generator(
-    skims_directory: pathlib.Path, name: str, hubs: list[int], transfer_time_pt: int, transfer_time_bike: int
-):
-    """Generate skim input files for chains (P+R)
-
-    Note: The hubs are internally converted for zero-base indexing.
     """
-    # Correct for zero-base indexing.
-    hubs = np.array(hubs) - 1
+    num_zones = len(car_time)
+    # Initialize with a high value
+    result_bike = np.full((num_zones, num_zones), np.inf)
+    result_ride = np.full((num_zones, num_zones), np.inf)
 
-    car_times = read_csv(skims_directory / "Auto_Tijd.csv")
-    bike_times = read_csv(skims_directory / "Fiets_Tijd.csv")
-    pt_times = read_csv(skims_directory / "OV_Tijd.csv")
-    car_distances = read_csv(skims_directory / "Auto_Afstand.csv")
-    pt_distances = read_csv(skims_directory / "OV_Afstand.csv")
+    for hub_idx in range(hubs.num_hubs):
+        # ASSUMPTION! Zones are zero indexed. In earlier discussions and old code both zero and one based indexing has been used. We should discuss.
+        zone_idx = int(hubs.zones[hub_idx])
+        hub_cost = hubs.hub_costs_cents[hub_idx] / 100
+        change_time_bike = hubs.bike_transfer_times[hub_idx]
+        change_time_pt = hubs.pt_transfer_times[hub_idx]
+        pay_for_pt = hubs.pay_for_pt[hub_idx]
 
-    n_hubs = len(hubs)
-    n_car_times = len(car_times)
+        # Car leg: origin -> hub (shape: n)
+        car_leg = car_time[:, zone_idx] + factor * (var_car_rate + road_pricing) * car_dist[:, zone_idx]
 
-    pr_origin_times = np.zeros((n_car_times, n_car_times, n_hubs))
-    pr_destination_times = np.zeros((n_car_times, n_car_times, n_hubs))
-    pr_bike_times = np.zeros((n_car_times, n_car_times, n_hubs))
-    pr_origin_pt_distances = np.zeros((n_car_times, n_car_times, n_hubs))
-    pr_origin_car_distances = np.zeros((n_car_times, n_car_times, n_hubs))
-    pr_destination_pt_distances = np.zeros((n_car_times, n_car_times, n_hubs))
-    pr_destination_car_distances = np.zeros((n_car_times, n_car_times, n_hubs))
-    pr_bike_car_distances = np.zeros((n_car_times, n_car_times, n_hubs))
-
-    for i, j in np.ndindex(n_car_times, n_car_times):
-        mask = pt_times[i, hubs] <= car_times[hubs, j]
-
-        pr_destination_times[i, j, :] = np.where(
-            mask,
-            pt_times[i, hubs] + car_times[hubs, j],
-            car_times[i, hubs] + pt_times[hubs, j],
+        # P+Bike: car_leg + bike from hub to destination + bike variable cost + transfer + hub cost
+        p_bike = (
+            car_leg[:, np.newaxis]
+            + bike_time[zone_idx, :][np.newaxis, :]
+            + change_time_bike
+            + factor * bike_cost_euro_per_km * bike_dist[zone_idx, :][np.newaxis, :]
+            + factor * hub_cost
         )
 
-        pr_origin_times[i, j, :] = np.where(
-            mask,
-            car_times[i, hubs] + pt_times[hubs, j],
-            pt_times[i, hubs] + car_times[hubs, j],
+        # P+R: car_leg + PT from hub to destination + transfer + PT cost + hub cost
+        p_ride = (
+            car_leg[:, np.newaxis]
+            + pt_time[zone_idx, :][np.newaxis, :]
+            + change_time_pt
+            + factor * pt_dist[zone_idx, :][np.newaxis, :] * pt_km_price * pay_for_pt
+            + factor * hub_cost
         )
 
-        pr_destination_car_distances[i, j, :] = np.where(
-            mask,
-            car_distances[hubs, j],
-            car_distances[i, hubs],
+        result_bike = np.minimum(result_bike, p_bike)
+        result_ride = np.minimum(result_ride, p_ride)
+
+    if np.any(result_bike == np.inf) and hubs.num_hubs != 0:
+        raise ValueError(
+            f"A value in the park and bike travel time matrix is still infinite after considering travel via all {hubs.num_hubs} hubs."
+        )
+    if np.any(result_ride == np.inf) and hubs.num_hubs != 0:
+        raise ValueError(
+            f"A value in the park and ride travel time matrix is still infinite after considering travel via all {hubs.num_hubs} hubs."
         )
 
-        pr_destination_pt_distances[i, j, :] = np.where(
-            mask,
-            pt_distances[i, hubs],
-            pt_distances[hubs, j],
-        )
-
-        pr_origin_car_distances[i, j, :] = np.where(
-            mask,
-            car_distances[i, hubs],
-            car_distances[hubs, j],
-        )
-
-        pr_origin_pt_distances[i, j, :] = np.where(
-            mask,
-            pt_distances[hubs, j],
-            pt_distances[i, hubs],
-        )
-
-    for i, j in np.ndindex(n_car_times, n_car_times):
-        mask = bike_times[i, hubs] <= bike_times[hubs, j]
-
-        pr_bike_times[i, j, :] = np.where(
-            mask,
-            bike_times[i, hubs] + car_times[hubs, j],
-            bike_times[j, hubs] + car_times[hubs, i],
-        )
-
-        pr_bike_car_distances[i, j, :] = np.where(
-            mask,
-            car_distances[hubs, j],
-            car_distances[hubs, i],
-        )
-
-    # Add additional transfer times.
-    pr_destination_times += transfer_time_pt
-    pr_origin_times += transfer_time_pt
-    pr_bike_times += transfer_time_bike
-
-    # Apply rouding to all arrays.
-    arrays = [
-        pr_origin_times,
-        pr_destination_times,
-        pr_bike_times,
-        pr_origin_pt_distances,
-        pr_origin_car_distances,
-        pr_destination_pt_distances,
-        pr_destination_car_distances,
-        pr_bike_car_distances,
-    ]
-    for array in arrays:
-        array[:] = np.round(array)
-
-    # Compute minimum distance, time values.
-
-    # FIXME: The original implementation computed the minimum value by looping
-    # over the arrays with an starting value of 9999. This initial value needs
-    # to be kept when using numpy arrays as the contents _do_ exceed this value
-    # and this should be verified.
-    initial = 9999
-    pr_origin_time = np.min(pr_origin_times, axis=2, initial=initial)
-    pr_bike_time = np.min(pr_bike_times, axis=2, initial=initial)
-    pr_origin_pt_distance = np.min(pr_origin_pt_distances, axis=2, initial=initial)
-    pr_destination_car_distance = np.min(pr_destination_car_distances, axis=2, initial=initial)
-    pr_destination_pt_distance = np.min(pr_destination_pt_distances, axis=2, initial=initial)
-    pr_bike_car_distance = np.min(pr_bike_car_distances, axis=2, initial=initial)
-    pr_destination_time = np.min(pr_destination_times, axis=2, initial=initial)
-    pr_origin_car_distance = np.min(pr_origin_car_distances, axis=2, initial=initial)
-
-    # Extract hubs at minimum values.
-    rmin = np.argmin(pr_destination_times, axis=2)
-    fietsmin = np.argmin(pr_origin_car_distances, axis=2)
-    pr_min_hubs = hubs[rmin]
-    pr_min_hubs_bike = hubs[fietsmin]
-
-    # Convert hubs to one-base indexing before writing output.
-    pr_min_hubs += 1
-    pr_min_hubs_bike += 1
-
-    filename_and_data = [
-        (f"PplusR_{name}_bestemmings_Tijd.csv", pr_destination_time),
-        (f"PplusR_{name}_bestemmings_Afstand_Auto.csv", pr_destination_car_distance),
-        (f"PplusR_{name}_bestemmings_Afstand_OV.csv", pr_destination_pt_distance),
-        (f"PplusR_{name}_herkomst_Tijd.csv", pr_origin_time),
-        (f"PplusR_{name}_herkomst_Afstand_Auto.csv", pr_origin_car_distance),
-        (f"PplusR_{name}_herkomst_Afstand_OV.csv", pr_origin_pt_distance),
-        (f"Pplusfiets_{name}_Tijd.csv", pr_bike_time),
-        (f"Pplusfiets_{name}_Afstand_Auto.csv", pr_bike_car_distance),
-        (f"Pplusfiets_{name}_bestehubs.csv", pr_min_hubs_bike),
-        (f"PplusR_{name}_bestehubs.csv", pr_min_hubs),
-    ]
-    for filename, data in filename_and_data:
-        write_csv(data, skims_directory / filename)
+    return result_bike, result_ride
 
 
-if __name__ == "__main__":
-    skims_directory = pathlib.Path(ask_user_for_skims_directory())
-    hubs = ask_user_for_hubs()
-    hub_name = ask_user_for_hub_name()
-    transfer_times = ask_user_for_transfer_times()
-    chain_generator(skims_directory, hub_name, hubs, *transfer_times)
+def chain_generator(generalized_travel_time: DataSource, config: dict):
+    """Generate generalized travel time skims for chains (P+R and P+Bike).
+
+    For each origin, computes the cost of driving to each hub and then
+    continuing by bike or public transport. The result for each OD pair is
+    the minimum across all hubs:
+
+        P+Bike(i,j) = min_h( car(i,h) + bike(h,j) + transfer + hub_cost )
+        P+R(i,j)    = min_h( car(i,h) + PT(h,j) + transfer + PT_cost + hub_cost )
+
+    Results are stored in ``generalized_travel_time`` so they can be picked
+    up by the main generalized travel time computation.
+    """
+    logger.info("Starting step: Compute chain (P+R / P+Bike) generalized travel times.")
+
+    project_config = config["project"]
+    skims_config = config["skims"]
+    tvom_config = config["TVOM"]
+    ketens_config = config["ketens"]
+
+    regime = project_config["beprijzingsregime"]
+    motive_name = project_config["motief"]["naam"]
+    motive_tvom = project_config["motief"]["TVOM"]
+    hub_name = ketens_config["chains"]["naam hub"]
+    tvom = tvom_config[TvomType.WORK] if motive_tvom == TvomType.WORK else tvom_config[TvomType.OTHER]
+
+    var_fossil = skims_config["Kosten auto fossiele brandstof"]["variabele kosten"] / 100
+    road_pricing_fossil = skims_config["Kosten auto fossiele brandstof"]["kmheffing"] / 100
+    var_electric = skims_config["Kosten elektrische auto"]["variabele kosten"] / 100
+    road_pricing_electric = skims_config["Kosten elektrische auto"]["kmheffing"] / 100
+    pt_km_price = skims_config["OV kosten"]["kmkosten"] / 100
+    bike_cost_euro_per_km = skims_config["bike_cost_ct_per_km"] / 100
+    part_of_day = skims_config["dagsoort"]
+
+    income_levels = ["laag", "middellaag", "middelhoog", "hoog"]
+    fuel_kinds = ["fossiel", "elektrisch"]
+
+    hubs = Hubs(read_csv_from_config(config, key="ketens", id="chains"))
+
+    skims_dir = config["project"]["paden"]["skims_directory"]
+    skims_reader = SkimsSource(skims_dir)
+
+    for pod in part_of_day:
+        car_time = skims_reader.read("Auto_Tijd", pod)
+        car_dist = skims_reader.read("Auto_Afstand", pod)
+        bike_time = skims_reader.read("Fiets_Tijd", pod)
+        default_speed_km_p_minute = 15 / 60
+        bike_dist = skims_reader.read("Fiets_Afstand", pod, default=(bike_time * default_speed_km_p_minute))
+        pt_time = skims_reader.read("OV_Tijd", pod)
+        pt_dist = skims_reader.read("OV_Afstand", pod)
+
+        for income_level in income_levels:
+            factor = tvom.get(income_level)
+
+            for fuel_kind in fuel_kinds:
+                if fuel_kind == "fossiel":
+                    var_car_rate = var_fossil
+                    road_pricing = road_pricing_fossil
+                else:
+                    var_car_rate = var_electric
+                    road_pricing = road_pricing_electric
+
+                result_bike, result_ride = _compute_chain_travel_time(
+                    hubs=hubs,
+                    car_time=car_time,
+                    car_dist=car_dist,
+                    bike_time=bike_time,
+                    bike_dist=bike_dist,
+                    pt_time=pt_time,
+                    pt_dist=pt_dist,
+                    factor=factor,
+                    var_car_rate=var_car_rate,
+                    road_pricing=road_pricing,
+                    pt_km_price=pt_km_price,
+                    bike_cost_euro_per_km=bike_cost_euro_per_km,
+                )
+
+                key = DataKey(
+                    id=f"Pplusfiets_{fuel_kind}",
+                    part_of_day=pod,
+                    income=income_level,
+                    hub_name=hub_name,
+                    motive=motive_name,
+                    regime=regime,
+                )
+                generalized_travel_time.set(key, result_bike)
+
+                key = DataKey(
+                    id=f"PplusR_{fuel_kind}",
+                    part_of_day=pod,
+                    income=income_level,
+                    hub_name=hub_name,
+                    motive=motive_name,
+                    regime=regime,
+                )
+                generalized_travel_time.set(key, result_ride)

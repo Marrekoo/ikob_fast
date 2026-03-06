@@ -1,8 +1,10 @@
 import logging
+import pathlib
 
 import numpy as np
 
 import ikob.utils as utils
+from ikob.chain_generator import chain_generator
 from ikob.configuration_definition import TvomType
 from ikob.datasource import (
     DataKey,
@@ -74,9 +76,6 @@ def generalized_travel_time(config) -> DataSource:
 
     if additional_costs:
         additional_cost_matrix = read_csv_from_config(config, key="geavanceerd", id="additionele_kosten")
-    if chains:
-        hubset = read_csv_from_config(config, key="ketens", id="chains")
-        print(hubset)
 
     income_levels = ["laag", "middellaag", "middelhoog", "hoog"]
     pt_km_price = pt_km_price / 100
@@ -94,6 +93,9 @@ def generalized_travel_time(config) -> DataSource:
     skims_reader = SkimsSource(skims_dir)
 
     generalized_travel_time = DataSource(config, DataType.GENERALIZED_TRAVEL_TIME)
+
+    if chains:
+        chain_generator(generalized_travel_time, config)
 
     num_zones = None
     for pod in part_of_day:
