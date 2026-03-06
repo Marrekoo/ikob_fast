@@ -170,7 +170,6 @@ The remaining folders contain test projects and reference output.
 
 There are some reference tests:
 - tests/e2e/test_end_to_end.py
-- tests/unit/test_chain_generator.py
 - tests/unit/test_parking_cost_file.py
 - tests/unit/test_group_distribution.py
 
