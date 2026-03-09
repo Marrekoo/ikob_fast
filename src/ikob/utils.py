@@ -78,16 +78,6 @@ def write_csv(matrix, filenaam, index=CsvIndex(), header=[]):
     np.savetxt(filenaam, matrix, fmt=fmt, delimiter=delim, header=header, comments="")
 
 
-def costs_public_transport(distance, pt_km_price, starting_rate, pricecap, pricecap_value):
-    distance = np.where(distance < 0, 0, distance)
-    distance = starting_rate + distance * pt_km_price
-
-    if pricecap:
-        np.clip(distance, None, pricecap_value, out=distance)
-
-    return distance
-
-
 def group_income_level(naam):
     if naam[-4:] == "hoog":
         if naam[-10:] == "middelhoog":
@@ -177,7 +167,7 @@ def combined_group(mod, gr):
 
 
 """
-Some functions that compute general travel time to avoid copying this logic
+Some functions that compute general travel time / costs to avoid copying this logic
 """
 
 
@@ -211,3 +201,13 @@ def compute_car_gtt(
         + tvom_factor
         * ((var_rate + road_pricing) * car_dist + additional_costs_euro / 100 + parking_costs_array_euro / 100)
     )
+
+
+def costs_public_transport(distance, pt_km_price, starting_rate, pricecap, pricecap_value):
+    distance = np.where(distance < 0, 0, distance)
+    distance = starting_rate + distance * pt_km_price
+
+    if pricecap:
+        np.clip(distance, None, pricecap_value, out=distance)
+
+    return distance
