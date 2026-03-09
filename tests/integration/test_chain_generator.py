@@ -58,7 +58,7 @@ def _make_config():
     }
 
 
-@pytest.mark.parametrize("hub_zone", [0, 1])
+@pytest.mark.parametrize("hub_zone", [1, 2])
 @pytest.mark.parametrize("income", ["laag", "middellaag", "middelhoog", "hoog"])
 @pytest.mark.parametrize("fuel", ["fossiel", "elektrisch"])
 def test_chain_matches_generalized_travel_time_legs(monkeypatch, hub_zone, income, fuel):
@@ -69,7 +69,7 @@ def test_chain_matches_generalized_travel_time_legs(monkeypatch, hub_zone, incom
     import ikob.chain_generator as cg
     import ikob.generalized_travel_time as gtt
 
-    num_zones = 2
+    num_zones = 30
     car_time, car_dist, bike_time, bike_dist, pt_time, pt_dist = _simple_matrices(num_zones)
 
     parking_times = np.zeros((num_zones, 3))
@@ -100,8 +100,6 @@ def test_chain_matches_generalized_travel_time_legs(monkeypatch, hub_zone, incom
     def fake_read_csv(config, key, id, type_caster=float, has_index_column=False):
         if key == "ketens" and id == "chains":
             return hub_data
-        if key == "ketens" and id == "bestemmingslijst":
-            return np.linspace(1, num_zones, num_zones, dtype=int)
         if key == "skims" and id == "parkeerzoektijden_bestand":
             return np.zeros(num_zones)
         raise AssertionError(f"Unexpected read_csv_from_config: key={key!r}, id={id!r}")

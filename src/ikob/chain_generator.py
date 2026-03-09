@@ -20,6 +20,9 @@ class Hubs:
         self.pay_for_pt = hubs[:, 4]
         self.num_hubs: int = len(hubs)
 
+        if np.any(hubs[:, 0] < 1):
+            raise ValueError("Zone number < 1 found in hubs. Zone indexing should start at 1.")
+
 
 def compute_chain_travel_time(
     hubs: Hubs,
@@ -43,9 +46,8 @@ def compute_chain_travel_time(
     element-wise minimum across all hubs.
     """
     num_zones = len(car_time)
-    # 9999 is used throughout the code as a pseudo infinite travel time that's still outputted as a number
-    result_bike = np.full((num_zones, num_zones), 9999.0)
-    result_ride = np.full((num_zones, num_zones), 9999.0)
+    result_bike = np.full((num_zones, num_zones), np.inf)
+    result_ride = np.full((num_zones, num_zones), np.inf)
 
     destination_mask = np.zeros(num_zones, dtype=bool)
     destination_mask[destination_list - 1] = True  # Zones in config use 1 based indexing
@@ -86,6 +88,9 @@ def compute_chain_travel_time(
         result_bike[:, destination_mask] = np.minimum(result_bike, p_bike)[:, destination_mask]
         result_ride[:, destination_mask] = np.minimum(result_ride, p_ride)[:, destination_mask]
 
+    # 9999 is used throughout the code as a pseudo infinite travel time that's still outputted as a number
+    np.where(result_bike == np.inf, 9999.0, result_bike)
+    np.where(result_ride == np.inf, 9999.0, result_ride)
     return result_bike, result_ride
 
 
@@ -130,19 +135,23 @@ def chain_generator(generalized_travel_time: DataSource, config: dict):
     income_levels = ["laag", "middellaag", "middelhoog", "hoog"]
     fuel_kinds = ["fossiel", "elektrisch"]
 
-    hubs = Hubs(read_csv_from_config(config, key="ketens", id="chains"))
-    if hubs.num_hubs == 0:
-        logger.warning("Chain generator called but no hubs found in file at config['ketens']['chains'].")
-    destination_list = read_csv_from_config(config, key="ketens", id="bestemmingslijst", type_caster=int)
-
     skims_dir = config["project"]["paden"]["skims_directory"]
     skims_reader = SkimsSource(skims_dir)
 
     parking_times = read_parking_times(config)
+    num_zones = len(parking_times)
     if config["geavanceerd"]["additionele_kosten"]["gebruiken"]:
         additional_cost_matrix = read_csv_from_config(config, key="geavanceerd", id="additionele_kosten")
     else:
-        additional_cost_matrix = np.zeros((len(parking_times), len(parking_times)))
+        additional_cost_matrix = np.zeros((num_zones, num_zones))
+
+    hubs = Hubs(read_csv_from_config(config, key="ketens", id="chains"))
+    if hubs.num_hubs == 0:
+        logger.warning("Chain generator called but no hubs found in file at config['ketens']['chains'].")
+    if config["ketens"]["bestemmingslijst"]["gebruiken"]:
+        destination_list = read_csv_from_config(config, key="ketens", id="bestemmingslijst", type_caster=int)
+    else:
+        destination_list = np.linspace(1, num_zones, num_zones, dtype=int)
 
     for pod in part_of_day:
         car_time = skims_reader.read("Auto_Tijd", pod)
