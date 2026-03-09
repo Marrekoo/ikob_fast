@@ -10,8 +10,8 @@ def _make_hubs(zones, hub_costs, pt_transfer, bike_transfer, pay_for_pt):
     return Hubs(data)
 
 
-def _simple_matrices(n=4):
-    """Return small deterministic skim matrices for *n* zones."""
+def _skim_matrices(n=4):
+    """Return small deterministic skim matrices for n zones."""
     rng = np.random.default_rng(42)
     car_time = rng.random((n, n)) * 30
     car_dist = rng.random((n, n)) * 50
@@ -22,76 +22,63 @@ def _simple_matrices(n=4):
     return car_time, car_dist, bike_time, bike_dist, pt_time, pt_dist
 
 
-def test_single_hub_basic():
-    """With one hub the result equals that hub's contribution (where closer)."""
+def test_parking_time_at_hub_is_ignored():
+    """The parking time at the hub is incorporated in the hub transfer time.
+
+    The normal parking time for the zone is ignored"""
     n = 4
-    car_time, car_dist, bike_time, bike_dist, pt_time, pt_dist = _simple_matrices(n)
+    car_time, car_dist, bike_time, bike_dist, pt_time, pt_dist = _skim_matrices(n)
+    pt_cost = pt_dist * 0.10
 
-    # Hub at zone 2 (1-indexed), modest costs
-    hubs = _make_hubs(zones=[2], hub_costs=[100], pt_transfer=[5], bike_transfer=[3], pay_for_pt=[1])
-    factor = 2.0
-    var_car_rate = 0.05
-    road_pricing = 0.01
-    bike_cost_euro_per_km = 0.02
+    hub_zone = 2
+    hubs = _make_hubs(zones=[hub_zone], hub_costs=[100], pt_transfer=[5], bike_transfer=[3], pay_for_pt=[1])
 
-    # Pre-compute PT cost matrix (simple: no starting rate, no pricecap)
-    pt_km_price = 0.10
-    pt_cost = pt_dist * pt_km_price
-
-    result_bike, result_ride = compute_chain_travel_time(
-        hubs,
-        car_time,
-        car_dist,
-        bike_time,
-        bike_dist,
-        pt_time,
-        pt_cost,
-        factor,
-        var_car_rate,
-        road_pricing,
-        bike_cost_euro_per_km,
+    kwargs = dict(
+        hubs=hubs,
+        car_time=car_time,
+        car_dist=car_dist,
+        bike_time=bike_time,
+        bike_dist=bike_dist,
+        pt_time=pt_time,
+        pt_cost=pt_cost,
+        factor=2.0,
+        var_car_rate=0.05,
+        road_pricing=0.01,
+        bike_cost_euro_per_km=0.02,
         additional_costs=np.zeros((n, n)),
-        parking_times=np.zeros((n, 3)),
     )
 
-    # With just a single hub, the resulting times should be equal to taking the car to the hub, and then either the bike or pt
-    zone_with_hub = 2
-    hub_cost = 100 / 100
-    car_leg = car_time[:, zone_with_hub] + factor * (var_car_rate + road_pricing) * car_dist[:, zone_with_hub]
+    # parking_times without any parking search time at the hub zone
+    parking_times_zero = np.zeros((n, 3))
 
-    expected_bike = (
-        car_leg[:, np.newaxis]
-        + bike_time[zone_with_hub, :][np.newaxis, :]
-        + 3  # bike_transfer
-        + factor * bike_cost_euro_per_km * bike_dist[zone_with_hub, :][np.newaxis, :]
-        + factor * hub_cost
-    )
-    expected_ride = (
-        car_leg[:, np.newaxis]
-        + np.where(
-            pt_time[zone_with_hub, :] > 0.5,
-            pt_time[zone_with_hub, :] + factor * pt_cost[zone_with_hub, :] * 1,  # pay_for_pt=1
-            9999,
-        )[np.newaxis, :]
-        + 5  # pt_transfer
-        + factor * hub_cost
-    )
+    # parking_times with a large destination search time at the hub zone
+    parking_times_with_hub = np.zeros((n, 3))
+    parking_times_with_hub[hub_zone, 2] = 999
 
-    np.testing.assert_allclose(result_bike, expected_bike)
-    np.testing.assert_allclose(result_ride, expected_ride)
+    result_bike_zero, result_ride_zero = compute_chain_travel_time(**kwargs, parking_times=parking_times_zero)  # type: ignore
+    result_bike_hub, result_ride_hub = compute_chain_travel_time(**kwargs, parking_times=parking_times_with_hub)  # type: ignore
+
+    np.testing.assert_allclose(result_bike_hub, result_bike_zero)
+    np.testing.assert_allclose(result_ride_hub, result_ride_zero)
 
 
 def test_minimum_across_hubs():
     """With two hubs, element-wise minimum is taken correctly."""
     n = 4
-    car_time, car_dist, bike_time, bike_dist, pt_time, pt_dist = _simple_matrices(n)
-
+    car_time, car_dist, bike_time, bike_dist, pt_time, pt_dist = _skim_matrices(n)
+    hub_costs1 = 50
+    hub_costs3 = 80
+    pt_transfer1 = 4
+    pt_transfer3 = 6
+    bike_transfer1 = 2
+    bike_transfer3 = 3
+    pay_for_pt = 1
     hubs = _make_hubs(
         zones=[1, 3],
-        hub_costs=[50, 80],
-        pt_transfer=[4, 6],
-        bike_transfer=[2, 3],
-        pay_for_pt=[1, 1],
+        hub_costs=[hub_costs1, hub_costs3],
+        pt_transfer=[pt_transfer1, pt_transfer3],
+        bike_transfer=[bike_transfer1, bike_transfer3],
+        pay_for_pt=[pay_for_pt, pay_for_pt],
     )
 
     pt_cost = pt_dist * 0.08
@@ -112,13 +99,13 @@ def test_minimum_across_hubs():
         parking_times=np.zeros((n, 3)),
     )
 
-    # Result should be <= single-hub results
-    for zone_col in [0, 2]:  # hub zones 1 and 3 (0-indexed)
+    # Result is <= single-hub results
+    for zone in [1, 3]:
         single = _make_hubs(
-            zones=[zone_col + 1],
-            hub_costs=[50 if zone_col == 0 else 80],
-            pt_transfer=[4 if zone_col == 0 else 6],
-            bike_transfer=[2 if zone_col == 0 else 3],
+            zones=[zone],
+            hub_costs=[hub_costs1 if zone == 1 else hub_costs3],
+            pt_transfer=[pt_transfer1 if zone == 1 else pt_transfer3],
+            bike_transfer=[bike_transfer1 if zone == 1 else bike_transfer3],
             pay_for_pt=[1],
         )
         sb, sr = compute_chain_travel_time(
@@ -182,7 +169,7 @@ def _make_config():
     }
 
 
-def test_chain_generator(monkeypatch):
+def test_computed_keys(monkeypatch):
     """chain_generator populates the DataSource with P+Bike and P+R keys."""
     import ikob.chain_generator as cg
 

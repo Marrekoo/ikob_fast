@@ -73,7 +73,7 @@ def compute_chain_travel_time(
         )
 
         # P+Bike: origin -> hub by car, hub -> destination by bike
-        bike_leg = (utils.compute_bike_gtt(bike_time, bike_dist, bike_cost_euro_per_km, factor))[zone_idx, :]
+        bike_leg = utils.compute_bike_gtt(bike_time, bike_dist, bike_cost_euro_per_km, factor)[zone_idx, :]
         p_bike = car_leg[:, np.newaxis] + bike_leg[np.newaxis, :] + change_time_bike
 
         # P+R: origin -> hub by car, hub -> destination by public transport
@@ -137,6 +137,8 @@ def chain_generator(generalized_travel_time: DataSource, config: dict):
     fuel_kinds = ["fossiel", "elektrisch"]
 
     hubs = Hubs(read_csv_from_config(config, key="ketens", id="chains"))
+    if hubs.num_hubs == 0:
+        logger.warning("Chain generator called but no hubs found in file at config['ketens']['chains'].")
 
     skims_dir = config["project"]["paden"]["skims_directory"]
     skims_reader = SkimsSource(skims_dir)
