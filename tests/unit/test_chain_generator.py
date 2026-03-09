@@ -46,6 +46,7 @@ def test_parking_time_at_hub_is_ignored():
         road_pricing=0.01,
         bike_cost_euro_per_km=0.02,
         additional_costs=np.zeros((n, n)),
+        destination_list=np.linspace(1, n, n, dtype=int),
     )
 
     # parking_times without any parking search time at the hub zone
@@ -97,6 +98,7 @@ def test_minimum_across_hubs():
         bike_cost_euro_per_km=0.02,
         additional_costs=np.zeros((n, n)),
         parking_times=np.zeros((n, 3)),
+        destination_list=np.linspace(1, n, n, dtype=int),
     )
 
     # Result is <= single-hub results
@@ -122,9 +124,53 @@ def test_minimum_across_hubs():
             bike_cost_euro_per_km=0.02,
             additional_costs=np.zeros((n, n)),
             parking_times=np.zeros((n, 3)),
+            destination_list=np.linspace(1, n, n, dtype=int),
         )
         assert np.all(result_bike <= sb + 1e-10)
         assert np.all(result_ride <= sr + 1e-10)
+
+
+def test_destination_list():
+    """Destinations not in the destinations list have an "infinite" travel time via the hub"""
+    n = 4
+    car_time, car_dist, bike_time, bike_dist, pt_time, pt_dist = _skim_matrices(n)
+    hub_costs1 = 50
+    hub_costs3 = 80
+    pt_transfer1 = 4
+    pt_transfer3 = 6
+    bike_transfer1 = 2
+    bike_transfer3 = 3
+    pay_for_pt = 1
+    hubs = _make_hubs(
+        zones=[1, 3],
+        hub_costs=[hub_costs1, hub_costs3],
+        pt_transfer=[pt_transfer1, pt_transfer3],
+        bike_transfer=[bike_transfer1, bike_transfer3],
+        pay_for_pt=[pay_for_pt, pay_for_pt],
+    )
+
+    pt_cost = pt_dist * 0.08
+
+    result_bike, result_ride = compute_chain_travel_time(
+        hubs,
+        car_time,
+        car_dist,
+        bike_time,
+        bike_dist,
+        pt_time,
+        pt_cost,
+        factor=1.5,
+        var_car_rate=0.04,
+        road_pricing=0.02,
+        bike_cost_euro_per_km=0.02,
+        additional_costs=np.zeros((n, n)),
+        parking_times=np.zeros((n, 3)),
+        destination_list=np.array([1, 2, 4]),
+    )
+    assert np.allclose(result_bike[:, 2], 9999.0)
+    assert not np.any(np.isclose(result_bike[:, [0, 1, 3]], 9999.0))
+    assert np.allclose(result_ride[:, 2], 9999.0)
+    assert not np.any(np.isclose(result_ride[:, [0, 1, 3]], 9999.0))
 
 
 def _make_config():
@@ -177,19 +223,18 @@ def test_computed_keys(monkeypatch):
     rng = np.random.default_rng(99)
 
     skims_data = {
-        ("Auto_Tijd", "restdag"): rng.random((num_zones, num_zones)) * 30,
-        ("Auto_Afstand", "restdag"): rng.random((num_zones, num_zones)) * 30,
-        ("Fiets_Tijd", "restdag"): rng.random((num_zones, num_zones)) * 30,
-        ("OV_Tijd", "restdag"): rng.random((num_zones, num_zones)) * 30,
-        ("OV_Afstand", "restdag"): rng.random((num_zones, num_zones)) * 30,
+        "Auto_Tijd": rng.random((num_zones, num_zones)) * 30,
+        "Auto_Afstand": rng.random((num_zones, num_zones)) * 30,
+        "Fiets_Tijd": rng.random((num_zones, num_zones)) * 30,
+        "OV_Tijd": rng.random((num_zones, num_zones)) * 30,
+        "OV_Afstand": rng.random((num_zones, num_zones)) * 30,
     }
 
     def fake_skims_source(_skims_dir):
         class _Reader:
             def read(self, id, dagdeel, type_caster=float, default=None, has_index_column=False):
-                key = (id, dagdeel)
-                if key in skims_data:
-                    return np.array(skims_data[key], dtype=type_caster)
+                if id in skims_data:
+                    return np.array(skims_data[id], dtype=type_caster)
                 if default is not None:
                     return default
                 raise FileNotFoundError(f"Skim {id}/{dagdeel} not found, with no default.")
@@ -201,6 +246,8 @@ def test_computed_keys(monkeypatch):
     def fake_read_csv_from_config(config, key, id, type_caster=float, has_index_column=False):
         if key == "ketens" and id == "chains":
             return hub_data
+        if key == "ketens" and id == "bestemmingslijst":
+            return np.linspace(1, num_zones, num_zones, dtype=int)
         raise AssertionError(f"Unexpected read_csv_from_config call: key={key!r}, id={id!r}")
 
     monkeypatch.setattr(cg, "SkimsSource", fake_skims_source)

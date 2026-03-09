@@ -76,20 +76,19 @@ def test_chain_matches_generalized_travel_time_legs(monkeypatch, hub_zone, incom
     parking_times[:, 0] = np.arange(num_zones)
 
     skims_data = {
-        ("Auto_Tijd", "restdag"): car_time,
-        ("Auto_Afstand", "restdag"): car_dist,
-        ("Fiets_Tijd", "restdag"): bike_time,
-        ("Fiets_Afstand", "restdag"): bike_dist,
-        ("OV_Tijd", "restdag"): pt_time,
-        ("OV_Afstand", "restdag"): pt_dist,
+        "Auto_Tijd": car_time,
+        "Auto_Afstand": car_dist,
+        "Fiets_Tijd": bike_time,
+        "Fiets_Afstand": bike_dist,
+        "OV_Tijd": pt_time,
+        "OV_Afstand": pt_dist,
     }
 
     def fake_skims_source(_skims_dir):
         class _Reader:
             def read(self, id, dagdeel, type_caster=float, default=None, has_index_column=False):
-                key = (id, dagdeel)
-                if key in skims_data:
-                    return np.array(skims_data[key], dtype=type_caster)
+                if id in skims_data:
+                    return np.array(skims_data[id], dtype=type_caster)
                 if default is not None:
                     return default
                 raise FileNotFoundError(f"Skim {id}/{dagdeel} not found, with no default.")
@@ -101,6 +100,8 @@ def test_chain_matches_generalized_travel_time_legs(monkeypatch, hub_zone, incom
     def fake_read_csv(config, key, id, type_caster=float, has_index_column=False):
         if key == "ketens" and id == "chains":
             return hub_data
+        if key == "ketens" and id == "bestemmingslijst":
+            return np.linspace(1, num_zones, num_zones, dtype=int)
         if key == "skims" and id == "parkeerzoektijden_bestand":
             return np.zeros(num_zones)
         raise AssertionError(f"Unexpected read_csv_from_config: key={key!r}, id={id!r}")
