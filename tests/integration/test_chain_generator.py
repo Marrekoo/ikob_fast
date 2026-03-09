@@ -171,7 +171,7 @@ def test_chain_matches_generalized_travel_time_legs(monkeypatch, hub_zone, incom
         )
     )
 
-    expected_bike = gen_car[:, hub_zone][:, np.newaxis] + gen_bike[hub_zone, :][np.newaxis, :]
-    expected_pt = gen_car[:, hub_zone][:, np.newaxis] + gen_pt[hub_zone, :][np.newaxis, :]
+    expected_bike = gen_car[:, hub_zone - 1][:, np.newaxis] + gen_bike[hub_zone - 1, :][np.newaxis, :]
+    expected_pt = gen_car[:, hub_zone - 1][:, np.newaxis] + gen_pt[hub_zone - 1, :][np.newaxis, :]
     np.testing.assert_allclose(chain_bike, expected_bike)
     np.testing.assert_allclose(chain_pt, expected_pt)

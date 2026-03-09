@@ -51,8 +51,7 @@ def compute_chain_travel_time(
     hub_parking_times[:, 2] = np.zeros(len(hub_parking_times))
 
     for hub_idx in range(hubs.num_hubs):
-        # ASSUMPTION! Zones are zero indexed. In earlier discussions and old code both zero and one based indexing has been used. We should discuss.
-        zone_idx = int(hubs.zones[hub_idx])
+        zone_idx = int(hubs.zones[hub_idx]) - 1  # zones use 1 based indexing
         hub_cost = hubs.hub_costs_cents[hub_idx] / 100
         change_time_bike = hubs.bike_transfer_times[hub_idx]
         change_time_pt = hubs.pt_transfer_times[hub_idx]
