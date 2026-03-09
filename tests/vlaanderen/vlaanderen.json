@@ -100,9 +100,9 @@
   },
   "ketens": {
     "chains": {
-      "gebruiken": false,
-      "bestand": "",
-      "naam hub": ""
+      "gebruiken": true,
+      "bestand": "tests/vlaanderen/hubset.csv",
+      "naam hub": "vlaanderen hubs"
     },
     "bestemmingslijst": {
       "gebruiken": false,

@@ -196,6 +196,8 @@ def chain_generator(generalized_travel_time: DataSource, config: dict):
                     hub_name=hub_name,
                     motive=motive_name,
                     regime=regime,
+                    index=DataKey.zone_index(len(result_bike)),
+                    header=DataKey.zone_header(len(result_bike)),
                 )
                 generalized_travel_time.set(key, result_bike)
 
@@ -206,5 +208,7 @@ def chain_generator(generalized_travel_time: DataSource, config: dict):
                     hub_name=hub_name,
                     motive=motive_name,
                     regime=regime,
+                    index=DataKey.zone_index(len(result_ride)),
+                    header=DataKey.zone_header(len(result_ride)),
                 )
                 generalized_travel_time.set(key, result_ride)
