@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 class Hubs:
     def __init__(self, hubs: npt.NDArray):
-        self.zones = hubs[:, 0]
+        self.zone_indices = hubs[:, 0] - 1  # Zones in config use 1 based indexing
         self.hub_costs_cents = hubs[:, 1]
         self.pt_transfer_times = hubs[:, 2]
         self.bike_transfer_times = hubs[:, 3]
@@ -35,23 +35,27 @@ def compute_chain_travel_time(
     bike_cost_euro_per_km: float,
     additional_costs: npt.NDArray,
     parking_times: npt.NDArray,
+    destination_list: npt.NDArray[np.integer],
 ) -> tuple[npt.NDArray, npt.NDArray]:
     """Compute Park+Bike and Park+Ride generalized travel time skims.
 
     For each hub, vectorized over all origin-destination pairs. Returns the
     element-wise minimum across all hubs.
-
     """
     num_zones = len(car_time)
-    result_bike = np.full((num_zones, num_zones), np.inf)
-    result_ride = np.full((num_zones, num_zones), np.inf)
+    # 9999 is used throughout the code as a pseudo infinite travel time that's still outputted as a number
+    result_bike = np.full((num_zones, num_zones), 9999.0)
+    result_ride = np.full((num_zones, num_zones), 9999.0)
+
+    destination_mask = np.zeros(num_zones, dtype=bool)
+    destination_mask[destination_list - 1] = True  # Zones in config use 1 based indexing
 
     # Hubs have their own transfer time that includes the parking time
     hub_parking_times = parking_times
     hub_parking_times[:, 2] = np.zeros(len(hub_parking_times))
 
     for hub_idx in range(hubs.num_hubs):
-        zone_idx = int(hubs.zones[hub_idx]) - 1  # zones use 1 based indexing
+        zone_idx = int(hubs.zone_indices[hub_idx])
         hub_cost = hubs.hub_costs_cents[hub_idx] / 100
         change_time_bike = hubs.bike_transfer_times[hub_idx]
         change_time_pt = hubs.pt_transfer_times[hub_idx]
@@ -79,17 +83,8 @@ def compute_chain_travel_time(
         pt_leg = utils.compute_pt_gtt(pt_time, pt_cost * pay_for_pt, factor)[zone_idx, :]
         p_ride = car_leg[:, np.newaxis] + pt_leg[np.newaxis, :] + change_time_pt
 
-        result_bike = np.minimum(result_bike, p_bike)
-        result_ride = np.minimum(result_ride, p_ride)
-
-    if np.any(result_bike == np.inf) and hubs.num_hubs != 0:
-        raise ValueError(
-            f"A value in the park and bike travel time matrix is still infinite after considering travel via all {hubs.num_hubs} hubs."
-        )
-    if np.any(result_ride == np.inf) and hubs.num_hubs != 0:
-        raise ValueError(
-            f"A value in the park and ride travel time matrix is still infinite after considering travel via all {hubs.num_hubs} hubs."
-        )
+        result_bike[:, destination_mask] = np.minimum(result_bike, p_bike)[:, destination_mask]
+        result_ride[:, destination_mask] = np.minimum(result_ride, p_ride)[:, destination_mask]
 
     return result_bike, result_ride
 
@@ -138,6 +133,7 @@ def chain_generator(generalized_travel_time: DataSource, config: dict):
     hubs = Hubs(read_csv_from_config(config, key="ketens", id="chains"))
     if hubs.num_hubs == 0:
         logger.warning("Chain generator called but no hubs found in file at config['ketens']['chains'].")
+    destination_list = read_csv_from_config(config, key="ketens", id="bestemmingslijst", type_caster=int)
 
     skims_dir = config["project"]["paden"]["skims_directory"]
     skims_reader = SkimsSource(skims_dir)
@@ -187,6 +183,7 @@ def chain_generator(generalized_travel_time: DataSource, config: dict):
                     bike_cost_euro_per_km=bike_cost_euro_per_km,
                     additional_costs=additional_cost_matrix,
                     parking_times=np.array(parking_times),
+                    destination_list=destination_list,
                 )
 
                 key = DataKey(
