@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 class Hubs:
     def __init__(self, hubs: npt.NDArray):
-        self.zone_indices = hubs[:, 0] - 1  # Zones in config use 1 based indexing
+        self.zone_indices = hubs[:, 0].astype(int) - 1  # Zones in config use 1 based indexing
         self.hub_costs_cents = hubs[:, 1]
         self.pt_transfer_times = hubs[:, 2]
         self.bike_transfer_times = hubs[:, 3]
@@ -46,51 +46,64 @@ def compute_chain_travel_time(
     element-wise minimum across all hubs.
     """
     num_zones = len(car_time)
-    result_bike = np.full((num_zones, num_zones), np.inf)
-    result_ride = np.full((num_zones, num_zones), np.inf)
 
     destination_mask = np.zeros(num_zones, dtype=bool)
     destination_mask[destination_list - 1] = True  # Zones in config use 1 based indexing
 
     # Hubs have their own transfer time that includes the parking time
-    hub_parking_times = parking_times
-    hub_parking_times[:, 2] = np.zeros(len(hub_parking_times))
+    hub_parking_times = parking_times.copy()
+    hub_parking_times[:, 2] = 0.0
 
-    for hub_idx in range(hubs.num_hubs):
-        zone_idx = int(hubs.zone_indices[hub_idx])
-        hub_cost = hubs.hub_costs_cents[hub_idx] / 100
-        change_time_bike = hubs.bike_transfer_times[hub_idx]
-        change_time_pt = hubs.pt_transfer_times[hub_idx]
-        pay_for_pt = hubs.pay_for_pt[hub_idx]
+    result_bike = np.full((num_zones, num_zones), np.inf)
+    result_ride = np.full((num_zones, num_zones), np.inf)
 
-        car_leg = (
-            utils.compute_car_gtt(
-                car_time=car_time,
-                car_dist=car_dist,
-                var_rate=var_car_rate,
-                road_pricing=road_pricing,
-                tvom_factor=factor,
-                additional_costs_euro=additional_costs,
-                parking_costs_array_euro=np.zeros(len(additional_costs)),  # parking costs are in the hub_cost
-                parking_times_array=hub_parking_times,
-            )[:, zone_idx]
-            + hub_cost * factor
-        )
+    if hubs.num_hubs == 0:
+        # 9999 is used throughout the code as a pseudo infinite travel time that's still outputted as a number
+        result_bike = np.where(result_bike == np.inf, 9999.0, result_bike)
+        result_ride = np.where(result_ride == np.inf, 9999.0, result_ride)
+        return result_bike, result_ride
 
-        # P+Bike: origin -> hub by car, hub -> destination by bike
-        bike_leg = utils.compute_bike_gtt(bike_time, bike_dist, bike_cost_euro_per_km, factor)[zone_idx, :]
-        p_bike = car_leg[:, np.newaxis] + bike_leg[np.newaxis, :] + change_time_bike
+    zone_indices = hubs.zone_indices
+    hub_costs = hubs.hub_costs_cents / 100
+    change_time_bike = hubs.bike_transfer_times
+    change_time_pt = hubs.pt_transfer_times
+    pay_for_pt = hubs.pay_for_pt
 
-        # P+R: origin -> hub by car, hub -> destination by public transport
-        pt_leg = utils.compute_pt_gtt(pt_time, pt_cost * pay_for_pt, factor)[zone_idx, :]
-        p_ride = car_leg[:, np.newaxis] + pt_leg[np.newaxis, :] + change_time_pt
+    # Time of taking the car from origins to hubs
+    car_leg = (
+        utils.compute_car_gtt(
+            car_time=car_time,
+            car_dist=car_dist,
+            var_rate=var_car_rate,
+            road_pricing=road_pricing,
+            tvom_factor=factor,
+            additional_costs_euro=additional_costs,
+            parking_costs_array_euro=np.zeros(num_zones),  # parking costs are in the hub_cost
+            parking_times_array=hub_parking_times,
+        )[:, zone_indices]
+        + hub_costs[np.newaxis, :] * factor
+    )
 
-        result_bike[:, destination_mask] = np.minimum(result_bike, p_bike)[:, destination_mask]
-        result_ride[:, destination_mask] = np.minimum(result_ride, p_ride)[:, destination_mask]
+    # Time of cycling from hubs to destinations
+    bike_leg = utils.compute_bike_gtt(bike_time, bike_dist, bike_cost_euro_per_km, factor)[zone_indices, :]
+
+    # Time of taking pt from hubs to destinations
+    pt_leg = utils.compute_pt_gtt(
+        pt_time[zone_indices, :], pt_cost[zone_indices, :] * pay_for_pt[:, np.newaxis], factor
+    )
+
+    p_bike = car_leg[:, :, np.newaxis] + bike_leg[np.newaxis, :, :] + change_time_bike[np.newaxis, :, np.newaxis]
+    p_ride = car_leg[:, :, np.newaxis] + pt_leg[np.newaxis, :, :] + change_time_pt[np.newaxis, :, np.newaxis]
+
+    result_bike_all = np.min(p_bike, axis=1)
+    result_ride_all = np.min(p_ride, axis=1)
+
+    result_bike[:, destination_mask] = result_bike_all[:, destination_mask]
+    result_ride[:, destination_mask] = result_ride_all[:, destination_mask]
 
     # 9999 is used throughout the code as a pseudo infinite travel time that's still outputted as a number
-    np.where(result_bike == np.inf, 9999.0, result_bike)
-    np.where(result_ride == np.inf, 9999.0, result_ride)
+    result_bike = np.where(result_bike == np.inf, 9999.0, result_bike)
+    result_ride = np.where(result_ride == np.inf, 9999.0, result_ride)
     return result_bike, result_ride
 
 
