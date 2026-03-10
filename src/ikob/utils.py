@@ -193,16 +193,16 @@ def compute_car_gtt(
     var_rate: float,
     road_pricing: float,
     tvom_factor: float,
-    additional_costs_euro: npt.NDArray,
+    additional_costs_eurocent: npt.NDArray,
     parking_times_array: npt.NDArray,
-    parking_costs_array_euro: npt.NDArray,
+    parking_costs_array_eurocent: npt.NDArray,
 ):
     parking_time_matrix = parking_times_array[:, 1][:, np.newaxis] + parking_times_array[:, 2][np.newaxis, :]
     return (
         car_time
         + parking_time_matrix
         + tvom_factor
-        * ((var_rate + road_pricing) * car_dist + additional_costs_euro / 100 + parking_costs_array_euro / 100)
+        * ((var_rate + road_pricing) * car_dist + additional_costs_eurocent / 100 + parking_costs_array_eurocent / 100)
     )
 
 

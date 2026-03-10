@@ -151,9 +151,9 @@ def generalized_travel_time(config) -> DataSource:
                     var_rate=var_car_rate,
                     road_pricing=road_pricing,
                     tvom_factor=tvom_factor,
-                    additional_costs_euro=additional_cost_matrix,
+                    additional_costs_eurocent=additional_cost_matrix,
                     parking_times_array=np.array(parking_times),
-                    parking_costs_array_euro=parking_cost_array,
+                    parking_costs_array_eurocent=parking_cost_array,
                 )
                 if chains:
                     key = DataKey(

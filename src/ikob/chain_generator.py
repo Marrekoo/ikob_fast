@@ -101,8 +101,8 @@ def compute_chain_travel_time(
             var_rate=var_car_rate,
             road_pricing=road_pricing,
             tvom_factor=tvom_factor,
-            additional_costs_euro=additional_costs,
-            parking_costs_array_euro=np.zeros(num_zones),  # parking costs are in the hub_cost
+            additional_costs_eurocent=additional_costs,
+            parking_costs_array_eurocent=np.zeros(num_zones),  # parking costs are in the hub_cost
             parking_times_array=hub_parking_times,
         )[:, hub_zones]
         + hub_costs[np.newaxis, :] * tvom_factor
