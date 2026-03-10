@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 class Hubs:
     def __init__(self, hubs: npt.NDArray):
+        self.validate(hubs)
         self.zone_indices: npt.NDArray[np.integer] = hubs[:, 0].astype(int) - 1  # Zones in config use 1 based indexing
         self.hub_costs_cents: npt.NDArray[np.floating] = hubs[:, 1]
         self.pt_transfer_times: npt.NDArray[np.floating] = hubs[:, 2]
@@ -20,8 +21,30 @@ class Hubs:
         self.pay_for_pt: npt.NDArray[np.bool_] = hubs[:, 4].astype(bool)
         self.num_hubs: int = len(hubs)
 
-        if np.any(hubs[:, 0] < 1):
-            raise ValueError("Zone number < 1 found in hubs. Zone indexing should start at 1.")
+    @staticmethod
+    def validate(hub_content_raw):
+        valid = True
+
+        if hub_content_raw.shape[0] == 0:
+            logger.warning("Hub data is empty.")
+            valid = False
+
+        if not hub_content_raw.shape[1] == 5:
+            logger.warning(f"Hub data should have 5 columns but has {hub_content_raw.shape[1]}.")
+            valid = False
+
+        if not all([zone.is_integer() for zone in hub_content_raw[:, 0]]):
+            logger.warning("The first column of the hub data (the zone numbers) should contain only integers.")
+            valid = False
+
+        if not (
+            all([pay_for_pt.is_integer() for pay_for_pt in hub_content_raw[:, 4]])
+            and np.all(np.logical_or(hub_content_raw[:, 4] == 1, hub_content_raw[:, 4] == 0))
+        ):
+            logger.warning("The fourth column of the hub data (wether to pay for pt) should contain either 0 or 1.")
+            valid = False
+
+        return valid
 
 
 def compute_chain_travel_time(
