@@ -32,7 +32,7 @@ def compute_chain_travel_time(
     bike_dist: npt.NDArray,
     pt_time: npt.NDArray,
     pt_cost: npt.NDArray,
-    factor: float,
+    tvom_factor: float,
     var_car_rate: float,
     road_pricing: float,
     bike_cost_euro_per_km: float,
@@ -77,17 +77,17 @@ def compute_chain_travel_time(
             car_dist=car_dist,
             var_rate=var_car_rate,
             road_pricing=road_pricing,
-            tvom_factor=factor,
+            tvom_factor=tvom_factor,
             additional_costs_euro=additional_costs,
             parking_costs_array_euro=np.zeros(num_zones),  # parking costs are in the hub_cost
             parking_times_array=hub_parking_times,
         )[:, hub_zones]
-        + hub_costs[np.newaxis, :] * factor
+        + hub_costs[np.newaxis, :] * tvom_factor
     )
 
-    bike_leg = utils.compute_bike_gtt(bike_time, bike_dist, bike_cost_euro_per_km, factor)[hub_zones, :]
+    bike_leg = utils.compute_bike_gtt(bike_time, bike_dist, bike_cost_euro_per_km, tvom_factor)[hub_zones, :]
 
-    pt_leg = utils.compute_pt_gtt(pt_time[hub_zones, :], pt_cost[hub_zones, :] * pay_for_pt[:, np.newaxis], factor)
+    pt_leg = utils.compute_pt_gtt(pt_time[hub_zones, :], pt_cost[hub_zones, :] * pay_for_pt[:, np.newaxis], tvom_factor)
 
     # Car from origin to hub, then some change time at the hub, then bike / pt from hub destination
     p_bike = (
@@ -132,7 +132,7 @@ def chain_generator(generalized_travel_time: DataSource, config: dict):
     motive_name = project_config["motief"]["naam"]
     motive_tvom = project_config["motief"]["TVOM"]
     hub_name = ketens_config["chains"]["naam hub"]
-    tvom = tvom_config[TvomType.WORK] if motive_tvom == TvomType.WORK else tvom_config[TvomType.OTHER]
+    tvom_dict = tvom_config[TvomType.WORK] if motive_tvom == TvomType.WORK else tvom_config[TvomType.OTHER]
 
     var_fossil = skims_config["Kosten auto fossiele brandstof"]["variabele kosten"] / 100
     road_pricing_fossil = skims_config["Kosten auto fossiele brandstof"]["kmheffing"] / 100
@@ -182,7 +182,7 @@ def chain_generator(generalized_travel_time: DataSource, config: dict):
             pt_cost = costs_public_transport(pt_dist, pt_km_price, starting_rate, pricecap, pricecap_value)
 
         for income_level in income_levels:
-            factor = tvom.get(income_level)
+            tvom_factor = tvom_dict.get(income_level)
 
             for fuel_kind in fuel_kinds:
                 if fuel_kind == "fossiel":
@@ -200,7 +200,7 @@ def chain_generator(generalized_travel_time: DataSource, config: dict):
                     bike_dist=bike_dist,
                     pt_time=pt_time,
                     pt_cost=pt_cost,
-                    factor=factor,
+                    tvom_factor=tvom_factor,
                     var_car_rate=var_car_rate,
                     road_pricing=road_pricing,
                     bike_cost_euro_per_km=bike_cost_euro_per_km,

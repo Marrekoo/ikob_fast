@@ -175,13 +175,13 @@ def compute_bike_gtt(
     bike_time_matrix: npt.NDArray,
     bike_distance_matrix: npt.NDArray,
     bike_cost_euro_per_km: float,
-    tvom_min_per_euro: float,
+    tvom_factor: float,
 ):
-    return bike_time_matrix + tvom_min_per_euro * bike_distance_matrix * bike_cost_euro_per_km
+    return bike_time_matrix + tvom_factor * bike_distance_matrix * bike_cost_euro_per_km
 
 
-def compute_pt_gtt(pt_time_matrix: npt.NDArray, pt_cost_matrix: npt.NDArray, factor: float):
-    return np.where(pt_time_matrix > 0.5, pt_time_matrix + factor * pt_cost_matrix, 9999)
+def compute_pt_gtt(pt_time_matrix: npt.NDArray, pt_cost_matrix: npt.NDArray, tvom_factor: float):
+    return np.where(pt_time_matrix > 0.5, pt_time_matrix + tvom_factor * pt_cost_matrix, 9999)
 
 
 def compute_car_gtt(
