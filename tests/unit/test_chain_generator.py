@@ -50,12 +50,12 @@ def test_parking_time_at_hub_is_ignored():
         destination_list=np.linspace(1, n, n, dtype=int),
     )
 
-    # parking_times without any parking search time at the hub zone
+    # parking_times without any parking search time
     parking_times_zero = np.zeros((n, 3))
 
-    # parking_times with a large destination search time at the hub zone
+    # parking_times with a large search time at destinations
     parking_times_with_hub = np.zeros((n, 3))
-    parking_times_with_hub[hub_zone, 2] = 999
+    parking_times_with_hub[:, 2] = 2718
 
     result_bike_zero, result_ride_zero = compute_chain_travel_time(**kwargs, parking_times=parking_times_zero)  # type: ignore
     result_bike_hub, result_ride_hub = compute_chain_travel_time(**kwargs, parking_times=parking_times_with_hub)  # type: ignore
