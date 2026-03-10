@@ -15,6 +15,37 @@ def _simple_matrices(num_zones):
     return car_time, car_dist, bike_time, bike_dist, pt_time, pt_dist
 
 
+def _setup(monkeypatch, cg, gtt, num_zones, car_time, car_dist, bike_time, bike_dist, pt_time, pt_dist):
+    parking_times = np.zeros((num_zones, 3))
+    parking_times[:, 0] = np.arange(num_zones)
+
+    skims_data = {
+        "Auto_Tijd": car_time,
+        "Auto_Afstand": car_dist,
+        "Fiets_Tijd": bike_time,
+        "Fiets_Afstand": bike_dist,
+        "OV_Tijd": pt_time,
+        "OV_Afstand": pt_dist,
+    }
+
+    def fake_skims_source(_skims_dir):
+        class _Reader:
+            def read(self, id, dagdeel, type_caster=float, default=None, has_index_column=False):
+                if id in skims_data:
+                    return np.array(skims_data[id], dtype=type_caster)
+                if default is not None:
+                    return default
+                raise FileNotFoundError(f"Skim {id}/{dagdeel} not found, with no default.")
+
+        return _Reader()
+
+    monkeypatch.setattr(cg, "SkimsSource", fake_skims_source)
+    monkeypatch.setattr(gtt, "SkimsSource", fake_skims_source)
+    monkeypatch.setattr(gtt, "SegsSource", lambda _config: None)
+    monkeypatch.setattr(gtt, "read_parking_times", lambda _config: parking_times)
+    monkeypatch.setattr(cg, "read_parking_times", lambda _config: parking_times)
+
+
 def _make_config():
     return {
         "project": {
@@ -61,7 +92,7 @@ def _make_config():
 @pytest.mark.parametrize("hub_zone", [1, 2])
 @pytest.mark.parametrize("income", ["laag", "middellaag", "middelhoog", "hoog"])
 @pytest.mark.parametrize("fuel", ["fossiel", "elektrisch"])
-def test_chain_matches_generalized_travel_time_legs(monkeypatch, hub_zone, income, fuel):
+def test_chain_matches_generalized_travel_time_legs_sum(monkeypatch, hub_zone, income, fuel):
     """With a zero-cost hub, the P+R chain time equals the generalized travel time to the hub plus the time to the destination.
 
     This test asserts that the chain computation and the generalized travel time computation use the same logic.
@@ -72,28 +103,8 @@ def test_chain_matches_generalized_travel_time_legs(monkeypatch, hub_zone, incom
     num_zones = 30
     car_time, car_dist, bike_time, bike_dist, pt_time, pt_dist = _simple_matrices(num_zones)
 
-    parking_times = np.zeros((num_zones, 3))
-    parking_times[:, 0] = np.arange(num_zones)
-
-    skims_data = {
-        "Auto_Tijd": car_time,
-        "Auto_Afstand": car_dist,
-        "Fiets_Tijd": bike_time,
-        "Fiets_Afstand": bike_dist,
-        "OV_Tijd": pt_time,
-        "OV_Afstand": pt_dist,
-    }
-
-    def fake_skims_source(_skims_dir):
-        class _Reader:
-            def read(self, id, dagdeel, type_caster=float, default=None, has_index_column=False):
-                if id in skims_data:
-                    return np.array(skims_data[id], dtype=type_caster)
-                if default is not None:
-                    return default
-                raise FileNotFoundError(f"Skim {id}/{dagdeel} not found, with no default.")
-
-        return _Reader()
+    config = _make_config()
+    _setup(monkeypatch, cg, gtt, num_zones, car_time, car_dist, bike_time, bike_dist, pt_time, pt_dist)
 
     hub_data = np.array([[hub_zone, 0, 0, 0, 1]], dtype=float)
 
@@ -104,19 +115,10 @@ def test_chain_matches_generalized_travel_time_legs(monkeypatch, hub_zone, incom
             return np.zeros(num_zones)
         raise AssertionError(f"Unexpected read_csv_from_config: key={key!r}, id={id!r}")
 
-    monkeypatch.setattr(cg, "SkimsSource", fake_skims_source)
     monkeypatch.setattr(cg, "read_csv_from_config", fake_read_csv)
-    monkeypatch.setattr(gtt, "SkimsSource", fake_skims_source)
-    monkeypatch.setattr(gtt, "SegsSource", lambda _config: None)
-    monkeypatch.setattr(gtt, "read_parking_times", lambda _config: parking_times)
     monkeypatch.setattr(gtt, "read_csv_from_config", fake_read_csv)
-    monkeypatch.setattr(cg, "read_parking_times", lambda _config: np.zeros((num_zones, 3)))
 
-    config = _make_config()
-
-    from ikob.generalized_travel_time import generalized_travel_time
-
-    datasource = generalized_travel_time(config)
+    datasource = gtt.generalized_travel_time(config)
 
     gen_car = datasource.get(
         DataKey(

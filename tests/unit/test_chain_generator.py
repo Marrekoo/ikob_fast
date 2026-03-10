@@ -64,24 +64,11 @@ def test_parking_time_at_hub_is_ignored():
     np.testing.assert_allclose(result_ride_hub, result_ride_zero)
 
 
-def test_minimum_across_hubs():
-    """With two hubs, element-wise minimum is taken correctly."""
+def test_no_hubs():
+    """With no hubs, the chain travel time is infinite"""
     n = 4
     car_time, car_dist, bike_time, bike_dist, pt_time, pt_dist = _skim_matrices(n)
-    hub_costs1 = 50
-    hub_costs3 = 80
-    pt_transfer1 = 4
-    pt_transfer3 = 6
-    bike_transfer1 = 2
-    bike_transfer3 = 3
-    pay_for_pt = 1
-    hubs = _make_hubs(
-        zones=[1, 3],
-        hub_costs=[hub_costs1, hub_costs3],
-        pt_transfer=[pt_transfer1, pt_transfer3],
-        bike_transfer=[bike_transfer1, bike_transfer3],
-        pay_for_pt=[pay_for_pt, pay_for_pt],
-    )
+    hubs = _make_hubs(zones=[], hub_costs=[], pt_transfer=[], bike_transfer=[], pay_for_pt=[])
 
     pt_cost = pt_dist * 0.08
 
@@ -102,6 +89,81 @@ def test_minimum_across_hubs():
         destination_list=np.linspace(1, n, n, dtype=int),
     )
 
+    np.testing.assert_allclose(IKOB_INFINITE, result_bike)
+    np.testing.assert_allclose(IKOB_INFINITE, result_ride)
+
+
+def test_no_pt_costs():
+    """When pay for pt is zero, the ride results are as though pt_cost is all zero"""
+    n = 4
+    car_time, car_dist, bike_time, bike_dist, pt_time, pt_dist = _skim_matrices(n)
+    pt_cost = pt_dist * 0.10
+
+    hub_zone = 2
+    common = dict(
+        car_time=car_time,
+        car_dist=car_dist,
+        bike_time=bike_time,
+        bike_dist=bike_dist,
+        pt_time=pt_time,
+        tvom_factor=2.0,
+        var_car_rate=0.05,
+        road_pricing=0.01,
+        bike_cost_euro_per_km=0.02,
+        additional_costs=np.zeros((n, n)),
+        parking_times=np.zeros((n, 3)),
+        destination_list=np.linspace(1, n, n, dtype=int),
+    )
+
+    # pay_for_pt=0 with real pt_cost
+    hubs_no_pay = _make_hubs(zones=[hub_zone], hub_costs=[100], pt_transfer=[5], bike_transfer=[3], pay_for_pt=[0])
+    _, result_ride_no_pay = compute_chain_travel_time(hubs=hubs_no_pay, pt_cost=pt_cost, **common)
+
+    # pay_for_pt=1 with zero pt_cost
+    hubs_pay = _make_hubs(zones=[hub_zone], hub_costs=[100], pt_transfer=[5], bike_transfer=[3], pay_for_pt=[1])
+    _, result_ride_zero_cost = compute_chain_travel_time(hubs=hubs_pay, pt_cost=np.zeros_like(pt_cost), **common)
+
+    np.testing.assert_allclose(result_ride_no_pay, result_ride_zero_cost)
+
+
+def test_minimum_across_hubs():
+    """With two hubs, element-wise minimum is taken correctly."""
+    n = 4
+    car_time, car_dist, bike_time, bike_dist, pt_time, pt_dist = _skim_matrices(n)
+    hub_costs1 = 50
+    hub_costs3 = 80
+    pt_transfer1 = 4
+    pt_transfer3 = 6
+    bike_transfer1 = 2
+    bike_transfer3 = 3
+    pay_for_pt = 1
+    hubs = _make_hubs(
+        zones=[1, 3],
+        hub_costs=[hub_costs1, hub_costs3],
+        pt_transfer=[pt_transfer1, pt_transfer3],
+        bike_transfer=[bike_transfer1, bike_transfer3],
+        pay_for_pt=[pay_for_pt, pay_for_pt],
+    )
+
+    pt_cost = pt_dist * 0.08
+    input_dict = dict(
+        car_time=car_time,
+        car_dist=car_dist,
+        bike_time=bike_time,
+        bike_dist=bike_dist,
+        pt_time=pt_time,
+        pt_cost=pt_cost,
+        tvom_factor=1.5,
+        var_car_rate=0.04,
+        road_pricing=0.02,
+        bike_cost_euro_per_km=0.02,
+        additional_costs=np.zeros((n, n)),
+        parking_times=np.zeros((n, 3)),
+        destination_list=np.linspace(1, n, n, dtype=int),
+    )
+
+    result_bike, result_ride = compute_chain_travel_time(hubs, **input_dict)
+
     # Result is <= single-hub results
     for zone in [1, 3]:
         single = _make_hubs(
@@ -111,22 +173,7 @@ def test_minimum_across_hubs():
             bike_transfer=[bike_transfer1 if zone == 1 else bike_transfer3],
             pay_for_pt=[1],
         )
-        sb, sr = compute_chain_travel_time(
-            single,
-            car_time,
-            car_dist,
-            bike_time,
-            bike_dist,
-            pt_time,
-            pt_cost,
-            tvom_factor=1.5,
-            var_car_rate=0.04,
-            road_pricing=0.02,
-            bike_cost_euro_per_km=0.02,
-            additional_costs=np.zeros((n, n)),
-            parking_times=np.zeros((n, 3)),
-            destination_list=np.linspace(1, n, n, dtype=int),
-        )
+        sb, sr = compute_chain_travel_time(single, **input_dict)
         assert np.all(result_bike <= sb + 1e-10)
         assert np.all(result_ride <= sr + 1e-10)
 
