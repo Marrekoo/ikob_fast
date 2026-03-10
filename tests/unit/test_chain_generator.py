@@ -2,6 +2,7 @@ import numpy as np
 
 from ikob.chain_generator import Hubs, chain_generator, compute_chain_travel_time
 from ikob.datasource import DataKey, DataSource, DataType
+from ikob.utils import IKOB_INFINITE
 
 
 def _make_hubs(zones, hub_costs, pt_transfer, bike_transfer, pay_for_pt):
@@ -167,10 +168,10 @@ def test_destination_list():
         parking_times=np.zeros((n, 3)),
         destination_list=np.array([1, 2, 4]),
     )
-    assert np.allclose(result_bike[:, 2], 9999.0)
-    assert not np.any(np.isclose(result_bike[:, [0, 1, 3]], 9999.0))
-    assert np.allclose(result_ride[:, 2], 9999.0)
-    assert not np.any(np.isclose(result_ride[:, [0, 1, 3]], 9999.0))
+    assert np.allclose(result_bike[:, 2], IKOB_INFINITE)
+    assert not np.any(np.isclose(result_bike[:, [0, 1, 3]], IKOB_INFINITE))
+    assert np.allclose(result_ride[:, 2], IKOB_INFINITE)
+    assert not np.any(np.isclose(result_ride[:, [0, 1, 3]], IKOB_INFINITE))
 
 
 def _make_config():

@@ -6,7 +6,7 @@ import numpy.typing as npt
 from ikob import utils
 from ikob.configuration_definition import TvomType
 from ikob.datasource import DataKey, DataSource, SkimsSource, read_csv_from_config, read_parking_times
-from ikob.utils import costs_public_transport
+from ikob.utils import IKOB_INFINITE, costs_public_transport
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +75,7 @@ def compute_chain_travel_time(
     destination_mask = np.zeros(num_zones, dtype=bool)
     destination_mask[destination_list - 1] = True  # Zones in config use 1 based indexing
 
+    # Initialize with true infinite values to overwrite these with gtt even if those are above IKOB_INFINITE
     result_bike = np.full((num_zones, num_zones), np.inf)
     result_ride = np.full((num_zones, num_zones), np.inf)
 
@@ -83,9 +84,8 @@ def compute_chain_travel_time(
     hub_parking_times[:, 2] = 0.0
 
     if hubs.num_hubs == 0:
-        # 9999 is used throughout the code as a pseudo infinite travel time that's still outputted as a number
-        result_bike = np.where(result_bike == np.inf, 9999.0, result_bike)
-        result_ride = np.where(result_ride == np.inf, 9999.0, result_ride)
+        result_bike = np.where(result_bike == np.inf, IKOB_INFINITE, result_bike)
+        result_ride = np.where(result_ride == np.inf, IKOB_INFINITE, result_ride)
         return result_bike, result_ride
 
     hub_zones = hubs.zone_indices
@@ -125,9 +125,8 @@ def compute_chain_travel_time(
     result_bike[:, destination_mask] = np.min(p_bike, axis=1)
     result_ride[:, destination_mask] = np.min(p_ride, axis=1)
 
-    # 9999 is used throughout the code as a pseudo infinite travel time that's still outputted as a number
-    result_bike = np.where(result_bike == np.inf, 9999.0, result_bike)
-    result_ride = np.where(result_ride == np.inf, 9999.0, result_ride)
+    result_bike = np.where(result_bike == np.inf, IKOB_INFINITE, result_bike)
+    result_ride = np.where(result_ride == np.inf, IKOB_INFINITE, result_ride)
     return result_bike, result_ride
 
 

@@ -7,6 +7,9 @@ import numpy.typing as npt
 
 logger = logging.getLogger(__name__)
 
+# This is used throughout the code as a pseudo infinite travel time that's still outputted as a number
+IKOB_INFINITE = 9999.0
+
 
 def zeros(lengte):
     return np.zeros(lengte)
@@ -181,7 +184,7 @@ def compute_bike_gtt(
 
 
 def compute_pt_gtt(pt_time_matrix: npt.NDArray, pt_cost_matrix: npt.NDArray, tvom_factor: float):
-    return np.where(pt_time_matrix > 0.5, pt_time_matrix + tvom_factor * pt_cost_matrix, 9999)
+    return np.where(pt_time_matrix > 0.5, pt_time_matrix + tvom_factor * pt_cost_matrix, IKOB_INFINITE)
 
 
 def compute_car_gtt(

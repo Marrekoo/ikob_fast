@@ -2,6 +2,7 @@ import logging
 from enum import Enum, StrEnum
 
 from ikob.config import build, validate
+from ikob.utils import IKOB_INFINITE
 
 logger = logging.getLogger(__name__)
 
@@ -147,7 +148,7 @@ def default_skims_tab():
                 "pricecap",
                 DataType.CHECKBOX,
             ),
-            "getal": config_item("Wat is de pricecap in Euros", DataType.NUMBER, default=9999.0),
+            "getal": config_item("Wat is de pricecap in Euros", DataType.NUMBER, default=IKOB_INFINITE),
         },
         "Kosten auto fossiele brandstof": {
             "variabele kosten": config_item(
@@ -180,14 +181,14 @@ def default_skims_tab():
                 "Deelauto (bezit geen auto, wel rijbewijs)",
                 DataType.NUMBER,
                 default=0.33,
-                bounds=[0, 9999],
+                bounds=[0, IKOB_INFINITE],
                 unit="Euro/km",
             ),
             "GeenRijbewijs": config_item(
                 "Taxi (bezit geen rijbewijs)",
                 DataType.NUMBER,
                 default=2.40,
-                bounds=[0, 9999],
+                bounds=[0, IKOB_INFINITE],
                 unit="Euro/km",
             ),
         },
@@ -197,14 +198,14 @@ def default_skims_tab():
                 "Deelauto (bezit geen auto, wel rijbewijs)",
                 DataType.NUMBER,
                 default=0.05,
-                bounds=[0, 9999],
+                bounds=[0, IKOB_INFINITE],
                 unit="Euro/Minuut",
             ),
             "GeenRijbewijs": config_item(
                 "Taxi (bezit geen rijbewijs)",
                 DataType.NUMBER,
                 default=0.40,
-                bounds=[0, 9999],
+                bounds=[0, IKOB_INFINITE],
                 unit="Euro/Minuut",
             ),
         },

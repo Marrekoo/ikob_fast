@@ -14,6 +14,7 @@ from ikob.datasource import (
     read_csv_from_config,
     read_parking_times,
 )
+from ikob.utils import IKOB_INFINITE
 
 logger = logging.getLogger(__name__)
 
@@ -204,7 +205,7 @@ def generalized_travel_time(config) -> DataSource:
 
             # Dan geen auto (rijbewijs)
             for kind in kind_no_car:
-                gtr_skim.fill(99999)
+                gtr_skim.fill(IKOB_INFINITE)
                 tvom_factor = tvom_dict.get(income_level)
                 for i in range(num_zones):
                     for j in range(num_zones):
@@ -253,7 +254,7 @@ def generalized_travel_time(config) -> DataSource:
             generalized_travel_time.set(key, gtr_skim.copy())
 
             # Free PT generalized travel time:
-            gtr_skim = np.where(pt_time_matrix > 0.5, pt_time_matrix, 9999)
+            gtr_skim = np.where(pt_time_matrix > 0.5, pt_time_matrix, IKOB_INFINITE)
             key = DataKey(
                 id="GratisOV",
                 part_of_day=pod,
