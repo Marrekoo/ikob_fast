@@ -13,11 +13,11 @@ logger = logging.getLogger(__name__)
 
 class Hubs:
     def __init__(self, hubs: npt.NDArray):
-        self.zone_indices = hubs[:, 0].astype(int) - 1  # Zones in config use 1 based indexing
-        self.hub_costs_cents = hubs[:, 1]
-        self.pt_transfer_times = hubs[:, 2]
-        self.bike_transfer_times = hubs[:, 3]
-        self.pay_for_pt = hubs[:, 4]
+        self.zone_indices: npt.NDArray[np.integer] = hubs[:, 0].astype(int) - 1  # Zones in config use 1 based indexing
+        self.hub_costs_cents: npt.NDArray[np.floating] = hubs[:, 1]
+        self.pt_transfer_times: npt.NDArray[np.floating] = hubs[:, 2]
+        self.bike_transfer_times: npt.NDArray[np.floating] = hubs[:, 3]
+        self.pay_for_pt: npt.NDArray[np.bool_] = hubs[:, 4].astype(bool)
         self.num_hubs: int = len(hubs)
 
         if np.any(hubs[:, 0] < 1):
