@@ -94,6 +94,7 @@ def compute_chain_travel_time(
     change_time_pt = hubs.pt_transfer_times
     pay_for_pt = hubs.pay_for_pt
 
+    # Travel via a hub consist of going by car to the hub, then continuing either by bike or by pt
     car_part = (
         utils.compute_car_gtt(
             car_time=car_time,
@@ -107,9 +108,7 @@ def compute_chain_travel_time(
         )[:, hub_zones]
         + hub_costs[np.newaxis, :] * tvom_factor
     )
-
     bike_part = utils.compute_bike_gtt(bike_time, bike_dist, bike_cost_euro_per_km, tvom_factor)[hub_zones, :]
-
     pt_part = utils.compute_pt_gtt(
         pt_time[hub_zones, :], pt_cost[hub_zones, :] * pay_for_pt[:, np.newaxis], tvom_factor
     )
