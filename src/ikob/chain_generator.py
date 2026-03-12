@@ -94,7 +94,7 @@ def compute_chain_travel_time(
     change_time_pt = hubs.pt_transfer_times
     pay_for_pt = hubs.pay_for_pt
 
-    car_leg = (
+    car_part = (
         utils.compute_car_gtt(
             car_time=car_time,
             car_dist=car_dist,
@@ -108,18 +108,22 @@ def compute_chain_travel_time(
         + hub_costs[np.newaxis, :] * tvom_factor
     )
 
-    bike_leg = utils.compute_bike_gtt(bike_time, bike_dist, bike_cost_euro_per_km, tvom_factor)[hub_zones, :]
+    bike_part = utils.compute_bike_gtt(bike_time, bike_dist, bike_cost_euro_per_km, tvom_factor)[hub_zones, :]
 
-    pt_leg = utils.compute_pt_gtt(pt_time[hub_zones, :], pt_cost[hub_zones, :] * pay_for_pt[:, np.newaxis], tvom_factor)
+    pt_part = utils.compute_pt_gtt(
+        pt_time[hub_zones, :], pt_cost[hub_zones, :] * pay_for_pt[:, np.newaxis], tvom_factor
+    )
 
     # Car from origin to hub, then some change time at the hub, then bike / pt from hub destination
     p_bike = (
-        car_leg[:, :, np.newaxis]
+        car_part[:, :, np.newaxis]
         + change_time_bike[np.newaxis, :, np.newaxis]
-        + bike_leg[np.newaxis, :, destination_mask]
+        + bike_part[np.newaxis, :, destination_mask]
     )
     p_ride = (
-        car_leg[:, :, np.newaxis] + change_time_pt[np.newaxis, :, np.newaxis] + pt_leg[np.newaxis, :, destination_mask]
+        car_part[:, :, np.newaxis]
+        + change_time_pt[np.newaxis, :, np.newaxis]
+        + pt_part[np.newaxis, :, destination_mask]
     )
 
     result_bike[:, destination_mask] = np.min(p_bike, axis=1)

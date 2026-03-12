@@ -92,7 +92,7 @@ def _make_config():
 @pytest.mark.parametrize("hub_zone", [1, 2])
 @pytest.mark.parametrize("income", ["laag", "middellaag", "middelhoog", "hoog"])
 @pytest.mark.parametrize("fuel", ["fossiel", "elektrisch"])
-def test_chain_matches_generalized_travel_time_legs_sum(monkeypatch, hub_zone, income, fuel):
+def test_chain_time_equals_sum_of_parts(monkeypatch, hub_zone, income, fuel):
     """With a zero-cost hub, the P+R chain time equals the generalized travel time to the hub plus the time to the destination.
 
     This test asserts that the chain computation and the generalized travel time computation use the same logic.

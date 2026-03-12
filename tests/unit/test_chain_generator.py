@@ -94,7 +94,7 @@ def test_no_hubs():
 
 
 def test_no_pt_costs():
-    """When pay for pt is zero, the ride results are as though pt_cost is all zero"""
+    """When pay_for_pt is zero, PT costs do not affect ride results"""
     n = 4
     car_time, car_dist, bike_time, bike_dist, pt_time, pt_dist = _skim_matrices(n)
     pt_cost = pt_dist * 0.10
