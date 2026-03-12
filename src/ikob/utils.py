@@ -46,7 +46,7 @@ class CsvIndex:
 
     @classmethod
     def zone_index(cls, num_zones):
-        return cls("zone", list(range(num_zones)))
+        return cls("zone", list(range(1, num_zones + 1)))
 
 
 def write_csv(matrix, filenaam, index=CsvIndex(), header=[]):

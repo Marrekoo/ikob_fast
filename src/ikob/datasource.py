@@ -207,7 +207,7 @@ class DataKey:
 
     @staticmethod
     def zone_header(num_zones):
-        return ["zone_" + str(i) for i in range(num_zones)]
+        return ["zone_" + str(i + 1) for i in range(num_zones)]
 
     @staticmethod
     def zone_index(num_zones):
