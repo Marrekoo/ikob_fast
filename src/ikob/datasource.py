@@ -90,7 +90,7 @@ class SkimsSource:
         self.skims_dir = pathlib.Path(skims_dir)
 
     def read(
-        self, id: str, dagdeel: str, type_caster=float, default: npt.NDArray | None = None, has_index_column=False
+        self, id: str, dagdeel: str, type_caster=float, default: npt.NDArray | None = None, has_index_column=True
     ) -> npt.NDArray:
         """Read skims from disk.
 
@@ -134,7 +134,7 @@ class SegsSource:
         return path / filename
 
     def read(
-        self, id: str, jaar="", type_caster: Type = int, scenario="", group="", modifier="", has_index_column=False
+        self, id: str, jaar="", type_caster: Type = int, scenario="", group="", modifier="", has_index_column=True
     ):
         # TODO: This is a temporary fix. The 'Verdeling_over_groepen*'
         # files are written to disk as SEGS files. These were originally

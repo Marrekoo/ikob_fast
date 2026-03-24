@@ -157,10 +157,10 @@ class FileValidator:
             logger.warning(f"The parking costs is expected to be of length equal to the number of zones, {num_zones}")
             return num_zones, False
 
-        if not (len(parking_times) == num_zones and len(parking_times[0]) == 3):
+        if not (len(parking_times) == num_zones and len(parking_times[0]) == 2):
             logger.warning(
-                "The parking times array is expected to contain 3 values for each zone (the zone, the arrival search time, the departure search time). "
-                f"The expected shape is (shape {(num_zones, 3)}), but found shape ({len(parking_times)}, {len(parking_times[0])})"
+                "The parking times array is expected to contain 2 values for each zone (the arrival search time and the departure search time). "
+                f"The expected shape is (shape {(num_zones, 2)}), but found shape ({len(parking_times)}, {len(parking_times[0])})"
             )
             return num_zones, False
 

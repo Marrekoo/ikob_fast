@@ -231,7 +231,7 @@ def generalized_travel_time(config) -> DataSource:
             tvom_factor = tvom_dict.get(income_level)
             for i in range(num_zones):
                 for j in range(num_zones):
-                    total_time = car_time_matrix[i][j] + parking_times[i][1] + parking_times[j][2]
+                    total_time = car_time_matrix[i][j] + parking_times[i][0] + parking_times[j][1]
                     if additional_costs:
                         gtr_skim[i][j] = total_time + tvom_factor * (
                             car_distance_matrix[i][j] * road_pricing_electric

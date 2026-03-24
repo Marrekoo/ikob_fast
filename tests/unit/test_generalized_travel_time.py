@@ -222,7 +222,7 @@ def test_generalized_travel_time_auto_fossiel(monkeypatch):
     auto_key = DataKey(id="Auto_fossiel", part_of_day=pod, income=income, regime=regime, motive=motive)
     auto = datasource.get(auto_key)
     # total_time = car_time + parking_arrival(origin) + parking_departure(dest)
-    total_time = car_time + parking_times[:, [1]] + parking_times[[0, 1, 2], [2]]
+    total_time = car_time + parking_times[:, [0]] + parking_times[[0, 1, 2], [1]]
     expected_auto = total_time + config["TVOM"][tvom][income] * car_dist * (
         config["skims"]["Kosten auto fossiele brandstof"]["variabele kosten"] / 100
         + config["skims"]["Kosten auto fossiele brandstof"]["kmheffing"] / 100
@@ -310,8 +310,8 @@ def test_generalized_travel_time_includes_additional_and_parking_costs(monkeypat
     # Focus assertion on one cell to keep intent clear:
     assert auto[0][1] == pytest.approx(
         car_time[0][1]
-        + parking_times[0][1]
-        + parking_times[1][2]
+        + parking_times[0][0]
+        + parking_times[1][1]
         + config["TVOM"][tvom][income]
         * (
             car_dist[0][1]
