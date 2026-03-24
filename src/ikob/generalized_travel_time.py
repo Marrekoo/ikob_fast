@@ -57,12 +57,12 @@ def generalized_travel_time(config) -> DataSource:
     pricecap = skims_config["pricecap"]["gebruiken"]
     pricecap_value = skims_config["pricecap"]["getal"]
     bike_cost_euro_per_km = skims_config["bike_cost_ct_per_km"] / 100
-    parking_times_temporary = read_csv_from_config(config, key="skims", id="parkeerzoektijden_bestand")
+    parking_times = read_parking_times(config)
 
     if parking_costs:
         parking_cost_array = read_csv_from_config(config, key="geavanceerd", id="parkeerkosten")
     else:
-        parking_cost_array = utils.zeros(len(parking_times_temporary))
+        parking_cost_array = utils.zeros(len(parking_times))
 
     if additional_costs:
         additional_cost_matrix = read_csv_from_config(config, key="geavanceerd", id="additionele_kosten")
@@ -79,7 +79,6 @@ def generalized_travel_time(config) -> DataSource:
     fuel_kinds = ["fossiel", "elektrisch"]
 
     SegsSource(config)
-    parking_times = read_parking_times(config)
 
     skims_dir = config["project"]["paden"]["skims_directory"]
     skims_reader = SkimsSource(skims_dir)

@@ -73,12 +73,11 @@ class FileValidator:
         num_zones = -1
 
         try:
-            parking_times_temporary = read_csv_from_config(self.config, key="skims", id="parkeerzoektijden_bestand")
+            parking_times = read_parking_times(self.config)
             if parking_costs:
                 parking_cost_array = read_csv_from_config(self.config, key="geavanceerd", id="parkeerkosten")
             else:
-                parking_cost_array = utils.zeros(len(parking_times_temporary))
-            parking_times = read_parking_times(self.config)
+                parking_cost_array = utils.zeros(len(parking_times))
         except Exception as e:
             logger.warning(
                 "A problem occurred while attempting to load the skims files: \n",
