@@ -32,12 +32,7 @@ def read_csv(filenaam, type_caster=float, has_index_column=True):
     except ValueError:
         matrix = np.loadtxt(filenaam, dtype=type_caster, skiprows=1, delimiter=",")
     if has_index_column:
-        if len(matrix.shape) != 2:
-            raise ValueError(
-                f"Reading file {filenaam} as a file with index column, but the matrix it contains is not two dimensional, so it cannot contain an index column."
-            )
-        index_column = matrix[:, 0]
-        _check_index_column(index_column, filenaam)
+        _check_index_column(matrix, filenaam)
         matrix = matrix[:, 1:]
     # If the matrix is really an array, return it as such
     if len(matrix[0, :]) == 1:
@@ -55,18 +50,20 @@ def read_csv_float(filenaam, has_index_column=True):
     return read_csv(filenaam, type_caster=float, has_index_column=has_index_column)
 
 
-def _check_index_column(index_column: npt.NDArray, filenaam):
+def _check_index_column(matrix: npt.NDArray, filenaam):
     """Assert that the given index column contains indices in sequential order, starting at 1: 1,2,3,4"""
+    index_column = matrix[:, 0]
+    if len(matrix.shape) != 2:
+        raise ValueError(
+            f"Reading file {filenaam} as a file with index column, but the matrix it contains is not two dimensional, so it cannot contain an index column."
+        )
     prev_index = 0
     for idx in index_column:
         if abs(round(idx) - idx) > 1e-5:
-            logger.warning(
-                f"Reading csv file {filenaam} with index column where index {idx} is not close to an integer"
-            )
-            continue
+            raise ValueError(f"Csv file {filenaam} has an invalid index column because index {idx} is not integer.")
         idx = int(round(idx))
         if idx - prev_index != 1:
-            logger.warning(f"Reading csv file {filenaam} with index column where index is not sequential.")
+            raise ValueError(f"Csv file {filenaam} has an invalid index column because the index is not sequential.")
         prev_index = idx
 
 
