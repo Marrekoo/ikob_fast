@@ -184,7 +184,10 @@ See OUTPUT.md for the structure of the output (results) directory. This file is 
 
 # Input
 
-The input is not (yet) extensively documented. The input files themselves contain a header and index column which give an indication of their content. Further instruction on how to build this input data can be found in the [ikob-scripts repo](https://github.com/Stichting-CROW/ikob-scripts).
+The input is not (yet) extensively documented. The input files themselves contain a header and index column which give an indication of their content.
+The headers are no more than a user facing description. Their content is ignored while reading files and all the data is simply treated as a numpy array.
+
+Further instruction on how to build this input data can be found in the [ikob-scripts repo](https://github.com/Stichting-CROW/ikob-scripts).
 
 # Groups 
 

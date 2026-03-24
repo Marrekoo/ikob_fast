@@ -27,6 +27,8 @@ def read_csv(filenaam, type_caster=float, has_index_column=True):
     # If this fails, read with skipping the header.
     try:
         matrix = np.loadtxt(filenaam, dtype=type_caster, delimiter=",")
+        if has_index_column:
+            logger.warning(f"Reading file {filenaam} without headers, but with an index column.")
     except ValueError:
         matrix = np.loadtxt(filenaam, dtype=type_caster, skiprows=1, delimiter=",")
     if has_index_column:
