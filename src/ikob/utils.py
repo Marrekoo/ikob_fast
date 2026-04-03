@@ -35,10 +35,11 @@ def read_csv(filenaam, type_caster=float, has_index_column=True):
         _check_index_column(matrix, filenaam)
         matrix = matrix[:, 1:]
     # If the matrix is really an array, return it as such
-    if len(matrix[0, :]) == 1:
-        return matrix[:, 0]
-    if len(matrix[:, 0]) == 1:
-        return matrix[0]
+    if len(matrix.shape) == 2:
+        if len(matrix[0, :]) == 1:
+            return matrix[:, 0]
+        if len(matrix[:, 0]) == 1:
+            return matrix[0]
     return matrix
 
 

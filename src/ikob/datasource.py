@@ -34,7 +34,7 @@ def get_temporary_directory(config) -> pathlib.Path:
     return project_dir / "tussenresultaten"
 
 
-def read_csv_from_config(config, key: str, id: str, type_caster=float):
+def read_csv_from_config(config, key: str, id: str, type_caster=float, has_index_column=True):
     """Read key from id section in the configuration file."""
     csv_path = config[key][id]
     if isinstance(csv_path, dict):
@@ -47,7 +47,7 @@ def read_csv_from_config(config, key: str, id: str, type_caster=float):
 
     csv_path = pathlib.Path(csv_path)
     try:
-        return utils.read_csv(csv_path, type_caster)
+        return utils.read_csv(csv_path, type_caster, has_index_column=has_index_column)
     except Exception:
         raise DataSourceError(
             f"Problem occurred while reading path from config with key: '{key}' and id '{id}'. Path is '{csv_path}'"

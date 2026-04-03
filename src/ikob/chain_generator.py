@@ -81,7 +81,7 @@ def compute_chain_travel_time(
 
     # Hubs have their own transfer time that includes the parking time
     hub_parking_times = parking_times.copy()
-    hub_parking_times[:, 2] = 0.0
+    hub_parking_times[:, 1] = 0.0
 
     if hubs.num_hubs == 0:
         result_bike = np.where(result_bike == np.inf, IKOB_INFINITE, result_bike)
@@ -184,11 +184,13 @@ def chain_generator(generalized_travel_time: DataSource, config: dict):
     else:
         additional_cost_matrix = np.zeros((num_zones, num_zones))
 
-    hubs = Hubs(read_csv_from_config(config, key="ketens", id="chains"))
+    hubs = Hubs(read_csv_from_config(config, key="ketens", id="chains", has_index_column=False))
     if hubs.num_hubs == 0:
         logger.warning("Chain generator called but no hubs found in file at config['ketens']['chains'].")
     if config["ketens"]["bestemmingslijst"]["gebruiken"]:
-        destination_list = read_csv_from_config(config, key="ketens", id="bestemmingslijst", type_caster=int)
+        destination_list = read_csv_from_config(
+            config, key="ketens", id="bestemmingslijst", type_caster=int, has_index_column=False
+        )
     else:
         destination_list = np.linspace(1, num_zones, num_zones, dtype=int)
 

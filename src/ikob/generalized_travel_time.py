@@ -67,7 +67,7 @@ def generalized_travel_time(config) -> DataSource:
     if additional_costs:
         additional_cost_matrix = read_csv_from_config(config, key="geavanceerd", id="additionele_kosten")
     else:
-        additional_cost_matrix = np.zeros((len(parking_times_temporary), len(parking_times_temporary)))
+        additional_cost_matrix = np.zeros((len(parking_times), len(parking_times)))
 
     income_levels = ["laag", "middellaag", "middelhoog", "hoog"]
     pt_km_price = pt_km_price / 100

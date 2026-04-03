@@ -35,7 +35,7 @@ class FileValidator:
         valid = True
         if self.config["ketens"]["chains"]["gebruiken"]:
             try:
-                hubs_raw = read_csv_from_config(self.config, key="ketens", id="chains")
+                hubs_raw = read_csv_from_config(self.config, key="ketens", id="chains", has_index_column=False)
 
             except Exception as e:
                 logger.warning("A problem occurred while attempting to load the hub file: \n", exc_info=e)
@@ -48,7 +48,7 @@ class FileValidator:
         if self.config["ketens"]["bestemmingslijst"]["gebruiken"]:
             try:
                 destination_list = read_csv_from_config(
-                    self.config, key="ketens", id="bestemmingslijst", type_caster=int
+                    self.config, key="ketens", id="bestemmingslijst", type_caster=int, has_index_column=False
                 )
 
             except Exception as e:
