@@ -35,7 +35,7 @@ class FileValidator:
         valid = True
         if self.config["ketens"]["chains"]["gebruiken"]:
             try:
-                hubs_raw = read_csv_from_config(self.config, key="ketens", id="chains")
+                hubs_raw = read_csv_from_config(self.config, key="ketens", id="chains", has_index_column=False)
 
             except Exception as e:
                 logger.warning("A problem occurred while attempting to load the hub file: \n", exc_info=e)
@@ -48,7 +48,7 @@ class FileValidator:
         if self.config["ketens"]["bestemmingslijst"]["gebruiken"]:
             try:
                 destination_list = read_csv_from_config(
-                    self.config, key="ketens", id="bestemmingslijst", type_caster=int
+                    self.config, key="ketens", id="bestemmingslijst", type_caster=int, has_index_column=False
                 )
 
             except Exception as e:
@@ -73,12 +73,11 @@ class FileValidator:
         num_zones = -1
 
         try:
-            parking_times_temporary = read_csv_from_config(self.config, key="skims", id="parkeerzoektijden_bestand")
+            parking_times = read_parking_times(self.config)
             if parking_costs:
                 parking_cost_array = read_csv_from_config(self.config, key="geavanceerd", id="parkeerkosten")
             else:
-                parking_cost_array = utils.zeros(len(parking_times_temporary))
-            parking_times = read_parking_times(self.config)
+                parking_cost_array = utils.zeros(len(parking_times))
         except Exception as e:
             logger.warning(
                 "A problem occurred while attempting to load the skims files: \n",
@@ -157,10 +156,10 @@ class FileValidator:
             logger.warning(f"The parking costs is expected to be of length equal to the number of zones, {num_zones}")
             return num_zones, False
 
-        if not (len(parking_times) == num_zones and len(parking_times[0]) == 3):
+        if not (len(parking_times) == num_zones and len(parking_times[0]) == 2):
             logger.warning(
-                "The parking times array is expected to contain 3 values for each zone (the zone, the arrival search time, the departure search time). "
-                f"The expected shape is (shape {(num_zones, 3)}), but found shape ({len(parking_times)}, {len(parking_times[0])})"
+                "The parking times array is expected to contain 2 values for each zone (the arrival search time and the departure search time). "
+                f"The expected shape is (shape {(num_zones, 2)}), but found shape ({len(parking_times)}, {len(parking_times[0])})"
             )
             return num_zones, False
 

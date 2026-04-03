@@ -57,17 +57,17 @@ def generalized_travel_time(config) -> DataSource:
     pricecap = skims_config["pricecap"]["gebruiken"]
     pricecap_value = skims_config["pricecap"]["getal"]
     bike_cost_euro_per_km = skims_config["bike_cost_ct_per_km"] / 100
-    parking_times_temporary = read_csv_from_config(config, key="skims", id="parkeerzoektijden_bestand")
+    parking_times = read_parking_times(config)
 
     if parking_costs:
         parking_cost_array = read_csv_from_config(config, key="geavanceerd", id="parkeerkosten")
     else:
-        parking_cost_array = utils.zeros(len(parking_times_temporary))
+        parking_cost_array = utils.zeros(len(parking_times))
 
     if additional_costs:
         additional_cost_matrix = read_csv_from_config(config, key="geavanceerd", id="additionele_kosten")
     else:
-        additional_cost_matrix = np.zeros((len(parking_times_temporary), len(parking_times_temporary)))
+        additional_cost_matrix = np.zeros((len(parking_times), len(parking_times)))
 
     income_levels = ["laag", "middellaag", "middelhoog", "hoog"]
     pt_km_price = pt_km_price / 100
@@ -79,7 +79,6 @@ def generalized_travel_time(config) -> DataSource:
     fuel_kinds = ["fossiel", "elektrisch"]
 
     SegsSource(config)
-    parking_times = read_parking_times(config)
 
     skims_dir = config["project"]["paden"]["skims_directory"]
     skims_reader = SkimsSource(skims_dir)
@@ -231,7 +230,7 @@ def generalized_travel_time(config) -> DataSource:
             tvom_factor = tvom_dict.get(income_level)
             for i in range(num_zones):
                 for j in range(num_zones):
-                    total_time = car_time_matrix[i][j] + parking_times[i][1] + parking_times[j][2]
+                    total_time = car_time_matrix[i][j] + parking_times[i][0] + parking_times[j][1]
                     if additional_costs:
                         gtr_skim[i][j] = total_time + tvom_factor * (
                             car_distance_matrix[i][j] * road_pricing_electric
