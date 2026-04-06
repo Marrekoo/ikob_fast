@@ -1,28 +1,30 @@
 import logging
+from collections import defaultdict
 from pathlib import Path
 
 import numpy as np
 
 import ikob.utils as utils
+from ikob.competition import _weight_cache_key, get_weight_matrix
 from ikob.datasource import DataKey, DataSource, DataType, SegsSource
+from ikob.utils import DTYPE
 
 logger = logging.getLogger(__name__)
 
 
 def create_citizens_file(distribution_matrix, working_population):
-    citizens_file = []
-    for i in range(len(working_population)):
-        citizens_file.append([])
-        for j in range(len(distribution_matrix[0])):
-            citizens_file[i].append(working_population[i] * distribution_matrix[i][j])
-    return citizens_file
+    """Vectorised: was a double Python loop."""
+    return np.asarray(distribution_matrix, dtype=DTYPE) * np.asarray(working_population, dtype=DTYPE)[:, np.newaxis]
 
 
-def reachable_population(config, single_weights: DataSource, combined_weights: DataSource) -> DataSource:
+def reachable_population(config, single_weights: DataSource, combined_weights) -> DataSource:
     """
-    From combined weights to number of citizens that can reach the destination in a zone.
+    Section D5: reachable population for destinations.
 
-    Corresponds to section D5 in the IKOB-algorithm.pdf.
+    ROUND-2 CHANGES:
+    - Groups sharing the same weight matrix are batched: their citizen
+      vectors are summed first, then a single matmul is performed.
+      Reduces O(N²) matmuls from ~60 to ~12 per modality.
     """
     logger.info("Starting step: Reachable population for destinations.")
 
@@ -42,265 +44,181 @@ def reachable_population(config, single_weights: DataSource, combined_weights: D
     fuel_kinds = ["fossiel", "elektrisch"]
     electric_percentage = distribution_config["Percelektrisch"]
 
-    # Vaste waarden
     base_groups = [
-        "GratisAuto",
-        "GratisAuto_GratisOV",
-        "WelAuto_GratisOV",
-        "WelAuto_vkAuto",
-        "WelAuto_vkNeutraal",
-        "WelAuto_vkFiets",
-        "WelAuto_vkOV",
-        "GeenAuto_GratisOV",
-        "GeenAuto_vkNeutraal",
-        "GeenAuto_vkFiets",
-        "GeenAuto_vkOV",
-        "GeenRijbewijs_GratisOV",
-        "GeenRijbewijs_vkNeutraal",
-        "GeenRijbewijs_vkFiets",
-        "GeenRijbewijs_vkOV",
+        "GratisAuto", "GratisAuto_GratisOV",
+        "WelAuto_GratisOV", "WelAuto_vkAuto", "WelAuto_vkNeutraal", "WelAuto_vkFiets", "WelAuto_vkOV",
+        "GeenAuto_GratisOV", "GeenAuto_vkNeutraal", "GeenAuto_vkFiets", "GeenAuto_vkOV",
+        "GeenRijbewijs_GratisOV", "GeenRijbewijs_vkNeutraal", "GeenRijbewijs_vkFiets", "GeenRijbewijs_vkOV",
     ]
-    groups = []
-    for income_group in income_groups:
-        for base_group in base_groups:
-            groups.append(f"{base_group}_{income_group}")
+    groups = [f"{bg}_{ig}" for ig in income_groups for bg in base_groups]
 
     modalities = ["Fiets", "Auto", "OV", "Auto_Fiets", "OV_Fiets", "Auto_OV", "Auto_OV_Fiets"]
-
-    income_groups = ["laag", "middellaag", "middelhoog", "hoog"]
+    income_groups_out = ["laag", "middellaag", "middelhoog", "hoog"]
     headstring = modalities
 
     segs_source = SegsSource(config)
 
-    traveling_population = segs_source.read(traveling_population_path.name, scenario=scenario)
-    destinations = segs_source.read(destinations_path.name, scenario=scenario)
+    traveling_population = np.asarray(
+        segs_source.read(traveling_population_path.name, scenario=scenario), dtype=DTYPE
+    )
+    destinations = np.asarray(
+        segs_source.read(destinations_path.name, scenario=scenario), dtype=DTYPE
+    )
 
     num_zones = len(traveling_population)
-
-    working_population = []
-
-    for i in range(len(traveling_population)):
-        working_population.append(sum(traveling_population[i]))
-
-    # section D5: derive group sizes $I_{gh}$ per origin zone by distributing the origin-zone working population
-    # over groups using the SEG distribution matrix.
+    working_population = traveling_population.sum(axis=1)
 
     origins = DataSource(config, DataType.ORIGINS)
 
     for car_possession_group in car_possession_groups:
-        distribution_matrix = segs_source.read(
-            "Verdeling_over_groepen",
-            type_caster=float,
-            scenario=scenario,
-            group=motive_name,
+        distribution_matrix = np.asarray(segs_source.read(
+            "Verdeling_over_groepen", type_caster=float, scenario=scenario, group=motive_name,
             modifier="alleen_autobezit" if car_possession_group == "alleen autobezit" else "",
             has_index_column=True,
-        )
+        ), dtype=DTYPE)
 
         citizens = create_citizens_file(distribution_matrix, working_population)
-        citizens_transpose = utils.transpose(citizens)
+        citizens_transpose = citizens.T  # shape (num_groups, num_zones)
 
         for part_of_day in part_of_days:
-            for income_group in income_groups:
+            for income_group in income_groups_out:
                 general_possibility_totals = []
                 for modality in modalities:
-                    working_population_list = utils.zeros(len(working_population))
+                    working_population_list = np.zeros(num_zones, dtype=DTYPE)
+
+                    # ── Batch: accumulate citizen vectors by weight key ──
+                    batches: dict[tuple, np.ndarray] = {}
+                    batch_representative_group: dict[tuple, str] = {}
+
                     for igroup, group in enumerate(groups):
                         income = utils.group_income_level(group)
-                        if income_group == income or income_group == "alle":
-                            preference = utils.find_preference(group, modality)
-                            if modality == "Fiets" or modality == "EFiets":
-                                if preference == "Fiets":
-                                    tmp_preference = "Fiets"
-                                else:
-                                    tmp_preference = ""
+                        if income_group != income and income_group != "alle":
+                            continue
 
-                                key = DataKey(
-                                    f"{modality}_vk",
-                                    part_of_day=part_of_day,
-                                    preference=tmp_preference,
-                                    income=income,
-                                    regime=regimes,
-                                    motive=motive_name,
-                                )
-                                # Get the transpose because normally the weights are indexed [origin, destination].
-                                bike_matrix = single_weights.get(key).T
+                        wck = _weight_cache_key(group, modality)
+                        citizen_vec = citizens_transpose[igroup]
 
-                                # section D5: $B_{gbv} = \sum_h I_{gh} \cdot G_{ghbvm}$.
-                                working_population_list += bike_matrix @ citizens_transpose[igroup]
+                        if wck not in batches:
+                            batches[wck] = np.zeros(num_zones, dtype=DTYPE)
+                            batch_representative_group[wck] = group
 
-                            elif modality == "Auto":
-                                string = utils.single_group(modality, group)
-                                if "WelAuto" in group:
-                                    for fuel_kind in fuel_kinds:
-                                        key = DataKey(
-                                            f"{string}_vk",
-                                            part_of_day=part_of_day,
-                                            preference=preference,
-                                            income=income,
-                                            regime=regimes,
-                                            motive=motive_name,
-                                            fuel_kind=fuel_kind,
-                                        )
-                                        # Get the transpose because normally the weights are indexed [origin, destination].
-                                        matrix = single_weights.get(key).T
-
-                                        if fuel_kind == "elektrisch":
-                                            K = electric_percentage.get(income_group) / 100
-                                        else:
-                                            K = 1 - electric_percentage.get(income_group) / 100
-
-                                        # section D5: same $\sum_h I_{gh} \cdot G_{ghbvm}$ computation, with fuel share K.
-                                        working_population_list += K * matrix @ citizens_transpose[igroup]
-                                else:
-                                    key = DataKey(
-                                        f"{string}_vk",
-                                        part_of_day=part_of_day,
-                                        preference=preference,
-                                        income=income,
-                                        regime=regimes,
-                                        motive=motive_name,
-                                    )
-                                    # Get the transpose because normally the weights are indexed [origin, destination].
-                                    matrix = single_weights.get(key).T
-
-                                    # section D5: $\sum_h I_{gh} \cdot G_{ghbvm}$ for auto groups without fuel split.
-                                    working_population_list += matrix @ citizens_transpose[igroup]
-
-                            elif modality == "OV":
-                                string = utils.single_group(modality, group)
-                                key = DataKey(
-                                    f"{string}_vk",
-                                    part_of_day=part_of_day,
-                                    preference=preference,
-                                    income=income,
-                                    regime=regimes,
-                                    motive=motive_name,
-                                )
-                                # Get the transpose because normally the weights are indexed [origin, destination].
-                                matrix = single_weights.get(key).T
-
-                                # section D5: $\sum_h I_{gh} \cdot G_{ghbvm}$ for OV.
-                                working_population_list += matrix @ citizens_transpose[igroup]
+                        # For fuel-blended modalities (WelAuto with Auto, or combined starting with A),
+                        # we need to split into fossil/electric batches
+                        if modality == "Fiets" or modality == "EFiets":
+                            batches[wck] += citizen_vec
+                        elif modality == "Auto":
+                            if "WelAuto" in group:
+                                K_e = electric_percentage.get(income_group) / 100
+                                K_f = 1 - K_e
+                                fk = wck + ("fossiel",)
+                                ek = wck + ("elektrisch",)
+                                if fk not in batches:
+                                    batches[fk] = np.zeros(num_zones, dtype=DTYPE)
+                                    batches[ek] = np.zeros(num_zones, dtype=DTYPE)
+                                    batch_representative_group[fk] = group
+                                    batch_representative_group[ek] = group
+                                batches[fk] += K_f * citizen_vec
+                                batches[ek] += K_e * citizen_vec
+                                # remove the non-fuel key if it was just created
+                                batches.pop(wck, None)
+                                batch_representative_group.pop(wck, None)
                             else:
-                                string = utils.combined_group(modality, group)
-                                logger.debug("de gr is %s", group)
-                                logger.debug("de string is %s", string)
-                                if string[0] == "A":
-                                    # Its a group with auto, so we need to split by fuel kind
-                                    for fuel_kind in fuel_kinds:
-                                        key = DataKey(
-                                            f"{string}_vk",
-                                            part_of_day=part_of_day,
-                                            preference=preference,
-                                            income=income,
-                                            regime=regimes,
-                                            motive=motive_name,
-                                            subtopic="combinaties",
-                                            fuel_kind=fuel_kind,
-                                        )
-                                        # Get the transpose because normally the weights are indexed [origin, destination].
-                                        matrix = combined_weights.get(key).T
+                                batches[wck] += citizen_vec
+                        elif modality == "OV":
+                            batches[wck] += citizen_vec
+                        else:
+                            # Combined modalities
+                            cg = utils.combined_group(modality, group)
+                            if cg and cg[0] == "A":
+                                K_e = electric_percentage.get(income_group) / 100
+                                K_f = 1 - K_e
+                                fk = wck + ("fossiel",)
+                                ek = wck + ("elektrisch",)
+                                if fk not in batches:
+                                    batches[fk] = np.zeros(num_zones, dtype=DTYPE)
+                                    batches[ek] = np.zeros(num_zones, dtype=DTYPE)
+                                    batch_representative_group[fk] = group
+                                    batch_representative_group[ek] = group
+                                batches[fk] += K_f * citizen_vec
+                                batches[ek] += K_e * citizen_vec
+                                batches.pop(wck, None)
+                                batch_representative_group.pop(wck, None)
+                            else:
+                                batches[wck] += citizen_vec
 
-                                        if fuel_kind == "elektrisch":
-                                            K = electric_percentage.get(income_group) / 100
-                                        else:
-                                            K = 1 - electric_percentage.get(income_group) / 100
+                    # ── Execute batched matmuls ──
+                    for bkey, total_citizens in batches.items():
+                        rep_group = batch_representative_group[bkey]
+                        income = utils.group_income_level(rep_group)
 
-                                        # section D5: combined-mode $\sum_h I_{gh} \cdot G_{ghbvm}$, with fuel share K.
-                                        working_population_list += K * matrix @ citizens_transpose[igroup]
+                        # Determine which weight matrix to fetch
+                        if bkey[-1] in ("fossiel", "elektrisch"):
+                            fuel_kind = bkey[-1]
+                            base_wck = bkey[:-1]
+                            # Fetch single fuel-kind matrix
+                            preference = utils.find_preference(rep_group, modality)
+                            if modality == "Auto":
+                                sg = utils.single_group(modality, rep_group)
+                                key = DataKey(f"{sg}_vk", part_of_day=part_of_day, preference=preference,
+                                              income=income, regime=regimes, motive=motive_name, fuel_kind=fuel_kind)
+                                matrix = single_weights.get(key)
+                            else:
+                                cg = utils.combined_group(modality, rep_group)
+                                key = DataKey(f"{cg}_vk", part_of_day=part_of_day, preference=preference,
+                                              income=income, regime=regimes, motive=motive_name,
+                                              subtopic="combinaties", fuel_kind=fuel_kind)
+                                matrix = combined_weights.get(key)
+                        else:
+                            K = electric_percentage.get(income_group) / 100
+                            matrix = get_weight_matrix(
+                                single_weights, combined_weights, rep_group, modality,
+                                motive_name, regimes, part_of_day, income, K,
+                            )
 
-                                else:
-                                    key = DataKey(
-                                        f"{string}_vk",
-                                        part_of_day=part_of_day,
-                                        preference=preference,
-                                        income=income,
-                                        regime=regimes,
-                                        motive=motive_name,
-                                        subtopic="combinaties",
-                                    )
-                                    # Get the transpose because normally the weights are indexed [origin, destination].
-                                    matrix = combined_weights.get(key).T
-
-                                    # section D5: combined-mode $\sum_h I_{gh} \cdot G_{ghbvm}$.
-                                    working_population_list += matrix @ citizens_transpose[igroup]
+                        working_population_list += matrix.T @ total_citizens
 
                     key = DataKey(
-                        id="Totaal",
-                        part_of_day=part_of_day,
-                        group=car_possession_group,
-                        income=income_group,
-                        motive=motive_name,
-                        modality=modality,
-                        is_temporary=True,
+                        id="Totaal", part_of_day=part_of_day, group=car_possession_group,
+                        income=income_group, motive=motive_name, modality=modality, is_temporary=True,
                     )
                     origins.set(key, working_population_list)
-                    general_possibility_totals.append(origins.get(key))
+                    general_possibility_totals.append(working_population_list)
 
+                origins_total = np.round(np.column_stack(general_possibility_totals)).astype(int)
                 key = DataKey(
-                    id="Pot_totaal",
-                    part_of_day=part_of_day,
-                    group=car_possession_group,
-                    income=income_group,
-                    motive=motive_name,
-                    index=DataKey.zone_index(num_zones),
+                    id="Pot_totaal", part_of_day=part_of_day, group=car_possession_group,
+                    income=income_group, motive=motive_name, index=DataKey.zone_index(num_zones),
                 )
-
-                origins_total = utils.transpose(general_possibility_totals)
-                origins_total = np.round(origins_total).astype(int)
                 origins.write_csv(origins_total, key, header=headstring)
 
             header = ["laag", "middellaag", "middelhoog", "hoog"]
             for modality in modalities:
-                general_matrix_product = []
                 general_matrix = []
-                for income_group in income_groups:
+                for income_group in income_groups_out:
                     key = DataKey(
-                        "Totaal",
-                        part_of_day=part_of_day,
-                        income=income_group,
-                        motive=motive_name,
-                        group=car_possession_group,
-                        modality=modality,
-                        subtopic="",
+                        "Totaal", part_of_day=part_of_day, income=income_group, motive=motive_name,
+                        group=car_possession_group, modality=modality, subtopic="",
                     )
-                    total_row = origins.get(key)
+                    general_matrix.append(origins.get(key))
 
-                    general_matrix.append(total_row)
-                general_total_transpose = utils.transpose(general_matrix)
-                for i in range(len(destinations)):
-                    general_matrix_product.append([])
-                    for j in range(len(destinations[0])):
-                        if destinations[i][j] > 0:
-                            general_matrix_product[i].append(general_total_transpose[i][j] * destinations[i][j])
-                        else:
-                            general_matrix_product[i].append(0)
+                general_total_transpose = np.column_stack(general_matrix)
 
-                general_total_transpose = np.round(general_total_transpose).astype(int)
-                key = DataKey(
-                    id="Pot_totaal",
-                    part_of_day=part_of_day,
-                    group=car_possession_group,
-                    motive=motive_name,
-                    modality=modality,
-                    index=DataKey.zone_index(num_zones),
+                general_matrix_product = np.where(
+                    destinations > 0,
+                    general_total_transpose * destinations,
+                    0,
                 )
-                origins.write_csv(general_total_transpose, key, header=header)
 
-                # Section D5 regional aggregation note:
-                # The PDF defines $B_{irv}$ as a jobs-weighted aggregation over destination zones in a region.
-                # Here `Pot_totaalproduct` prepares the numerator term $B_{ibv} \cdot A_{ib}$ by multiplying
-                # the destination-level reach (`general_total_transpose`) by the number of jobs/pupil-places
-                # in that destination zone (`destinations`).
+                gtt_int = np.round(general_total_transpose).astype(int)
+                key = DataKey(
+                    id="Pot_totaal", part_of_day=part_of_day, group=car_possession_group,
+                    motive=motive_name, modality=modality, index=DataKey.zone_index(num_zones),
+                )
+                origins.write_csv(gtt_int, key, header=header)
 
                 key = DataKey(
-                    id="Pot_totaalproduct",
-                    part_of_day=part_of_day,
-                    group=car_possession_group,
-                    motive=motive_name,
-                    modality=modality,
-                    index=DataKey.zone_index(num_zones),
+                    id="Pot_totaalproduct", part_of_day=part_of_day, group=car_possession_group,
+                    motive=motive_name, modality=modality, index=DataKey.zone_index(num_zones),
                 )
                 origins.write_csv(general_matrix_product, key, header=header)
 

@@ -35,7 +35,6 @@ def get_temporary_directory(config) -> pathlib.Path:
 
 
 def read_csv_from_config(config, key: str, id: str, type_caster=float, has_index_column=True):
-    """Read key from id section in the configuration file."""
     csv_path = config[key][id]
     if isinstance(csv_path, dict):
         csv_path = csv_path["bestand"]
@@ -55,12 +54,6 @@ def read_csv_from_config(config, key: str, id: str, type_caster=float, has_index
 
 
 def read_parking_times(config):
-    """Read parkeerzoektijden from disk.
-
-    When the parkeerzoektijden file is not present, it is attempted
-    to generate the parkeerzoektijden from stedelijkheidsgraad.
-    """
-
     config_skims = config["skims"]
     segs_dir = pathlib.Path(config["project"]["paden"]["segs_directory"])
 
@@ -72,31 +65,22 @@ def read_parking_times(config):
 
     urbanization_path = segs_dir / "Stedelijkheidsgraad.csv"
     assert urbanization_path.exists(), (
-        "Missing both Parkeerzoektijden, Stedelijkheidsgraad files.Parkeerzoektijden file cannot be generated."
+        "Missing both Parkeerzoektijden, Stedelijkheidsgraad files."
     )
 
-    msg = "Generating parking times from '%s'"
-    logger.info(msg, urbanization_path)
+    logger.info("Generating parking times from '%s'", urbanization_path)
     urbanization_grade = utils.read_csv_int(urbanization_path)
     return urbanization_grade_to_parking_times(urbanization_grade)
 
 
 class SkimsSource:
-    """A data provider for skims files."""
-
     def __init__(self, skims_dir: pathlib.Path | str):
         if skims_dir == "":
             raise DataSourceError("Skims source initialized with empty skims dir")
         self.skims_dir = pathlib.Path(skims_dir)
 
-    def read(
-        self, id: str, dagdeel: str, type_caster=float, default: npt.NDArray | None = None, has_index_column=True
-    ) -> npt.NDArray:
-        """Read skims from disk.
-
-        Reads the skim file formed by the identifier and dagdeel.
-        The ``type_caster`` allows to cast the data to a desired type.
-        """
+    def read(self, id: str, dagdeel: str, type_caster=float, default: npt.NDArray | None = None,
+             has_index_column=True) -> npt.NDArray:
         path = (self.skims_dir / dagdeel / id).with_suffix(".csv")
         if os.path.exists(path):
             return utils.read_csv(path, type_caster=type_caster, has_index_column=has_index_column)
@@ -107,8 +91,6 @@ class SkimsSource:
 
 
 class SegsSource:
-    """A data provider for SEGS files."""
-
     def __init__(self, config):
         self.segs_dir = pathlib.Path(config["project"]["paden"]["segs_directory"])
         if self.segs_dir == "":
@@ -124,28 +106,16 @@ class SegsSource:
 
     def _segs_dir(self, path, id, jaar, scenario, group="", modifier=""):
         filename = id + jaar
-
         for postfix in [group, modifier]:
             if postfix:
                 filename += f"_{postfix}"
-
         path = path / scenario
         os.makedirs(path, exist_ok=True)
         return path / filename
 
-    def read(
-        self, id: str, jaar="", type_caster: Type = int, scenario="", group="", modifier="", has_index_column=True
-    ):
-        # TODO: This is a temporary fix. The 'Verdeling_over_groepen*'
-        # files are written to disk as SEGS files. These were originally
-        # written back into the _input_ directory and read out in later
-        # stages of the program. This detects that behavior and diverts
-        # reading to the SEGS _output_ directory. Since this only happens
-        # for one variable, the fix is introduced here. Once that data is
-        # passed along as function arguments (kept in memory), this TODO
-        # is to be resolved.
+    def read(self, id: str, jaar="", type_caster: Type = int, scenario="", group="", modifier="",
+             has_index_column=True):
         should_read_from_output = "Verdeling_over_groepen" in id
-
         if should_read_from_output:
             path = self._segs_output_dir(id=id, jaar=jaar, scenario=scenario, group=group, modifier=modifier)
         else:
@@ -156,12 +126,11 @@ class SegsSource:
             return utils.read_csv(path, type_caster=type_caster, has_index_column=has_index_column)
         except FileNotFoundError:
             raise DataSourceError(
-                f"File SEGS file '{path}' not found. Is the scenario (used as subfolder) '{scenario}' correct?"
+                f"File SEGS file '{path}' not found. Is the scenario '{scenario}' correct?"
             )
 
-    def write_csv(
-        self, data, id, header, group="", jaar="", modifier="", scenario="", index: utils.CsvIndex = utils.CsvIndex()
-    ):
+    def write_csv(self, data, id, header, group="", jaar="", modifier="", scenario="",
+                  index: utils.CsvIndex = utils.CsvIndex()):
         path = self._segs_output_dir(id, jaar, scenario, group, modifier).with_suffix(".csv")
         return utils.write_csv(data, path, header=header, index=index)
 
@@ -177,17 +146,6 @@ class DataType(enum.Enum):
 
 @dataclass(eq=True, frozen=True)
 class DataKey:
-    """A collection of strings to identify data from the DataSource.
-
-    A DataKey instance is constructed with a subset of the required
-    strings and can be passed towards the DataSource to read/write
-    the desired data.
-
-    The header and index fields are used only when writing data and are used to add semantic information to the data written
-
-    The temporary field is to indicate that the data stored at this key is not meant to be persisted and only used to store a temporary result for further computation.
-    """
-
     id: str
     part_of_day: str
     regime: str = ""
@@ -223,10 +181,6 @@ class DataSource:
         self.cache: dict[DataKey, NDArray] = {}
         self.datatype = datatype
 
-        # TODO: Improve handling of data directory structure:
-        # - Extract paths/directory names from constants, e.g. Enum;
-        # - Support multi-lingual directory names.
-
     def _add_id_suffix(self, key: DataKey) -> str:
         id = key.id + key.preference
         for suffix in [key.modality, key.hub_name, key.income]:
@@ -240,15 +194,8 @@ class DataSource:
         dagdeel = key.part_of_day.lower()
         regime = key.regime.lower()
         path = (
-            self.project_dir
-            / base
-            / regime
-            / key.motive
-            / key.group
-            / self.datatype.value
-            / key.subtopic
-            / dagdeel
-            / key.fuel_kind
+            self.project_dir / base / regime / key.motive / key.group
+            / self.datatype.value / key.subtopic / dagdeel / key.fuel_kind
         )
         os.makedirs(path, exist_ok=True)
         return path / id_with_suffix
@@ -256,19 +203,16 @@ class DataSource:
     def _get_base_dir(self, key: DataKey) -> str:
         if self.datatype in [DataType.COMPETITION, DataType.ORIGINS]:
             return "resultaten"
-        # This is fickle. In practice the whole DataType.DESTINATIONS is also sent to the results dir
         if "totaal" in key.id.lower():
-            # Totaal, Ontpl_totaal, Ontpl_totaalproduct
             return "resultaten"
         return ""
 
-    def set(self, key: DataKey, data: NDArray):
+    def set(self, key: DataKey, data):
         self.cache[key] = data
 
-    def get(self, key: DataKey) -> NDArray:
+    def get(self, key: DataKey):
         if key in self.cache:
             return self.cache[key]
-
         data = self.read_csv(key)
         self.set(key, data)
         return data
@@ -290,6 +234,47 @@ class DataSource:
         if not header:
             header = key.header
         utils.write_csv(data, path, header=header, index=key.index)
+
+    def get_write_path(self, key: DataKey) -> pathlib.Path:
+        """Return the CSV path for *key*, creating directories as needed.
+
+        Use this when you want to build the path in the calling thread
+        (ensuring dirs exist) and then hand the actual write off to an
+        ``AsyncCsvWriter``.
+        """
+        return self._make_file_path(key).with_suffix(".csv")
+
+    # ── Memory management ────────────────────────────────────────────
+
+    def clear_cache(self):
+        """Release all cached arrays. Call after store() when data is no longer needed."""
+        n = len(self.cache)
+        self.cache.clear()
+        logger.debug("Cleared %d entries from %s cache.", n, self.datatype.value)
+
+    def clear_temporary(self):
+        """Release only temporary (is_temporary=True) entries to free memory."""
+        temp_keys = [k for k in self.cache if k.is_temporary]
+        for k in temp_keys:
+            del self.cache[k]
+        if temp_keys:
+            logger.debug("Cleared %d temporary entries from %s cache.", len(temp_keys), self.datatype.value)
+
+    def cache_size_mb(self) -> float:
+        """Estimate total memory held by cached arrays (MB)."""
+        import sys
+        total = 0
+        for v in self.cache.values():
+            try:
+                total += v.nbytes
+            except AttributeError:
+                try:
+                    from scipy import sparse
+                    if sparse.issparse(v):
+                        total += v.data.nbytes + v.indices.nbytes + v.indptr.nbytes
+                except (ImportError, AttributeError):
+                    total += sys.getsizeof(v)
+        return total / (1024 * 1024)
 
     @staticmethod
     def write_output_md(config):

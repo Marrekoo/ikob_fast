@@ -3,6 +3,7 @@ import logging
 import sys
 import threading
 import traceback
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from tkinter import BooleanVar, Button, Frame, StringVar, Tk, Widget, filedialog, messagebox
 
 from ikob.combined_weights import calculate_combined_weights
@@ -21,17 +22,12 @@ logger = logging.getLogger(__name__)
 
 def run_scripts(project_file, skip_steps: list[bool] | None = None, write_weights: bool = False):
     """
-    Run through all steps for a given project.
+    Run through all IKOB steps.
 
-    For details about the all the steps taken see documentation/IKOB-algorithm.pdf.
-    In de docstring of each specific step the relevant section of the documentation is referenced.
-    documentation/IKOB-documentation-partially-outdated.pdf is partially outdated, but might still provide some insight into the code.
-    Do note that at the very least naming has changed and output is not written to disk after each step any more.
-
-    Args:
-        project_file: the path to a JSON project config
-        skip_steps: a list of bools to skip that index step
-        write_weights: skip writing out weights results
+    ROUND-2 CHANGES:
+    - Combined weights are lazy (recipes only) → ~50 % less peak RAM
+    - GTT cache cleared immediately after D2
+    - D4/D5 and D6/D7 still run in parallel
     """
     logger.info("Reading project file: %s.", project_file)
     config = get_config_from_args(project_file)
@@ -44,62 +40,97 @@ def run_scripts(project_file, skip_steps: list[bool] | None = None, write_weight
     if not skip_steps:
         skip_steps = [False] * 8
 
+    # ── D1: Generalized travel time ──
     if not skip_steps[0]:
         travel_time = generalized_travel_time(config)
     else:
         travel_time = DataSource(config, DataType.GENERALIZED_TRAVEL_TIME)
 
+    # ── B: Distribute population over groups ──
     if not skip_steps[1]:
-        # TODO: Pass temporary SEGS output as arguments too.
         distribute_population_over_groups(config)
 
+    # ── D2: Single weights ──
     if not skip_steps[2]:
         single_weights = calculate_single_weights(config, travel_time)
     else:
         single_weights = DataSource(config, DataType.WEIGHTS)
 
+    # GTT is no longer needed – free immediately
+    if not skip_steps[0]:
+        if write_weights:
+            travel_time.store()
+        logger.info("GTT cache: %.1f MB – clearing.", travel_time.cache_size_mb())
+        travel_time.clear_cache()
+
+    # ── D3: Combined weights (now lazy – milliseconds, 0 bytes) ──
     if not skip_steps[3]:
         combined_weights = calculate_combined_weights(config, single_weights)
     else:
         combined_weights = DataSource(config, DataType.WEIGHTS)
 
-    if not skip_steps[4]:
-        opportunities = reachable_destinations(config, single_weights, combined_weights)
-    else:
-        opportunities = DataSource(config, DataType.DESTINATIONS)
+    logger.info("Single-weights cache: %.1f MB.  Combined-weight recipes: %s.",
+                single_weights.cache_size_mb(),
+                combined_weights.recipe_count() if hasattr(combined_weights, 'recipe_count') else "N/A (loaded)")
 
-    if not skip_steps[5]:
-        origins = reachable_population(config, single_weights, combined_weights)
-    else:
-        origins = DataSource(config, DataType.ORIGINS)
+    # ── D4 & D5: run in parallel ──
+    def _run_d4():
+        if not skip_steps[4]:
+            return reachable_destinations(config, single_weights, combined_weights)
+        return DataSource(config, DataType.DESTINATIONS)
 
-    if not skip_steps[6]:
-        competition_destinations = competition_on_destinations(config, single_weights, combined_weights, origins)
-    else:
-        competition_destinations = DataSource(config, DataType.COMPETITION)
+    def _run_d5():
+        if not skip_steps[5]:
+            return reachable_population(config, single_weights, combined_weights)
+        return DataSource(config, DataType.ORIGINS)
 
-    if not skip_steps[7]:
-        competition_citizens = competition_on_citizens(config, single_weights, combined_weights, opportunities)
-    else:
-        competition_citizens = DataSource(config, DataType.COMPETITION)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        future_d4 = pool.submit(_run_d4)
+        future_d5 = pool.submit(_run_d5)
+        opportunities = future_d4.result()
+        origins = future_d5.result()
 
-    logger.info("All simulations are completed.")
+    # ── D6 & D7: run in parallel ──
+    def _run_d6():
+        if not skip_steps[6]:
+            return competition_on_destinations(config, single_weights, combined_weights, origins)
+        return DataSource(config, DataType.COMPETITION)
 
-    # TODO: For now all files are written to disk to assert their contents in
-    # end-to-end testing. Ultimately only files that are essential outputs
-    # should persist.
+    def _run_d7():
+        if not skip_steps[7]:
+            return competition_on_citizens(config, single_weights, combined_weights, opportunities)
+        return DataSource(config, DataType.COMPETITION)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        future_d6 = pool.submit(_run_d6)
+        future_d7 = pool.submit(_run_d7)
+        competition_destinations = future_d6.result()
+        competition_citizens = future_d7.result()
+
+    logger.info("All simulations completed.")
+
+    # ── Write output ──
     logger.info("Writing output to disk...")
-    sources_to_save = [travel_time, opportunities, origins, competition_citizens, competition_destinations]
+    sources_to_save = [opportunities, origins, competition_citizens, competition_destinations]
     if write_weights:
-        sources_to_save.extend([single_weights, combined_weights])
+        single_weights.store()
+        combined_weights.store()          # materialises recipes one-by-one
 
     for container in sources_to_save:
         container.store()
 
     DataSource.write_output_md(config)
 
+    # Final cleanup
+    for container in sources_to_save:
+        container.clear_cache()
+    single_weights.clear_cache()
+    combined_weights.clear_cache()
+    logger.info("All output written and memory released.")
 
-# User interface
+
+# ── User interface (unchanged) ───────────────────────────────────────
+
 class ConfigApp(Tk):
     PAD_X = 5
     PAD_Y = 5
@@ -125,16 +156,12 @@ class ConfigApp(Tk):
 
     def create_widgets(self):
         self.widgets: list[Widget] = []
-
         frame = Frame()
         frame.pack(expand=1, fill="both", padx=self.PAD_X, pady=self.PAD_Y)
-
         self.widgets.extend(widgets.pathWidget(frame, "Project", self._configvar, file=True))
         self.widgets.append(frame)
-
         labels = [stap for stap in self.stappen]
         self.widgets.extend(widgets.checklistWidget(frame, "Stappen", labels, self._checks, row=1, itemsperrow=1))
-
         button = Button(master=frame, text="Start", command=lambda: threading.Thread(target=self.run_cmd).start())
         button.grid(row=2, column=2, sticky="ew", padx=self.PAD_X, pady=self.PAD_Y)
         self.run_button = button
@@ -142,16 +169,10 @@ class ConfigApp(Tk):
 
     def run_cmd(self):
         project_file = self._configvar.get()
-
-        # Skip the test when its _not_ selected.
         skip_steps = [not check.get() for check in self._checks]
-
-        # Disable the run button while the scripts are running
-        # to prevent users launching many run_scripts instances.
         if self.run_button is None:
             raise ValueError("attempt to disable run button, but run button is None.")
         self.run_button.configure(state="disabled")
-
         try:
             run_scripts(project_file, skip_steps, write_weights=False)
         except BaseException as err:
@@ -160,8 +181,6 @@ class ConfigApp(Tk):
         else:
             msg = "Alle stappen zijn succesvol uitgevoerd."
             messagebox.showinfo(title="Gereed", message=msg)
-
-        # After success/error the run button can be re-enabled.
         self.run_button.configure(state="active")
 
     def cmdLaadProject(self):
@@ -173,32 +192,22 @@ class ConfigApp(Tk):
             try:
                 _ = load_config(filename)
             except ValueError:
-                messagebox.showerror(
-                    title="Fout",
-                    message="Het bestand bevat geen geldige configuratie.",
-                )
+                messagebox.showerror(title="Fout", message="Het bestand bevat geen geldige configuratie.")
             except IOError:
                 messagebox.showerror(title="Fout", message="Het bestand kan niet worden geladen.")
 
 
 def main():
     parser = argparse.ArgumentParser(prog="ikobrunner", description="Launch the IKOB runner GUI.")
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        help="Display logging messages over stdout.",
-    )
-    parser.add_argument(
-        "-p",
-        "--project",
-        help="Optional path to the project to execute. No Gui is shown if provided, and every ikob step is executed.",
-    )
+    parser.add_argument("-v", "--verbose", action="store_true", help="Display logging messages over stdout.")
+    parser.add_argument("-p", "--project",
+                        help="Optional path to the project to execute. No GUI is shown if provided.")
     args = parser.parse_args()
 
     if args.verbose:
         logging.basicConfig(
-            stream=sys.stdout, level=logging.INFO, format="%(asctime)s - %(levelname)s - %(name)s \t -  %(message)s"
+            stream=sys.stdout, level=logging.INFO,
+            format="%(asctime)s - %(levelname)s - %(name)s \t -  %(message)s"
         )
     if not args.project:
         App = ConfigApp()

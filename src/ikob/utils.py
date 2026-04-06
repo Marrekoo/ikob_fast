@@ -7,24 +7,26 @@ import numpy.typing as npt
 
 logger = logging.getLogger(__name__)
 
-# This is used throughout the code as a pseudo infinite travel time that's still outputted as a number
+# ── Performance knobs ────────────────────────────────────────────────
+DTYPE = np.float32          # float32 halves memory; float64 if precision needed
+USE_SPARSE = True           # store weight matrices as scipy.sparse.csr_matrix
+# ─────────────────────────────────────────────────────────────────────
+
 IKOB_INFINITE = 9999.0
 
 
-def zeros(lengte):
-    return np.zeros(lengte)
+def zeros(lengte, dtype=None):
+    return np.zeros(lengte, dtype=dtype or DTYPE)
 
 
 def transpose(matrix):
-    return np.array(matrix).T
+    return np.asarray(matrix).T
 
 
 def read_csv(filenaam, type_caster=float, has_index_column=True):
     if not isinstance(filenaam, pathlib.Path):
         filenaam = pathlib.Path(filenaam)
 
-    # First, attempt to read without header.
-    # If this fails, read with skipping the header.
     try:
         matrix = np.loadtxt(filenaam, dtype=type_caster, delimiter=",")
         if has_index_column:
@@ -34,7 +36,6 @@ def read_csv(filenaam, type_caster=float, has_index_column=True):
     if has_index_column:
         _check_index_column(matrix, filenaam)
         matrix = matrix[:, 1:]
-    # If the matrix is really an array, return it as such
     if len(matrix.shape) == 2:
         if len(matrix[0, :]) == 1:
             return matrix[:, 0]
@@ -52,11 +53,10 @@ def read_csv_float(filenaam, has_index_column=True):
 
 
 def _check_index_column(matrix: npt.NDArray, filenaam):
-    """Assert that the given index column contains indices in sequential order, starting at 1: 1,2,3,4"""
     index_column = matrix[:, 0]
     if len(matrix.shape) != 2:
         raise ValueError(
-            f"Reading file {filenaam} as a file with index column, but the matrix it contains is not two dimensional, so it cannot contain an index column."
+            f"Reading file {filenaam} as a file with index column, but the matrix it contains is not two dimensional."
         )
     prev_index = 0
     for idx in index_column:
@@ -82,29 +82,54 @@ def write_csv(matrix, filenaam, index=CsvIndex(), header=[]):
     if not isinstance(filenaam, pathlib.Path):
         filenaam = pathlib.Path(filenaam)
 
-    matrix = np.array(matrix)
+    try:
+        from scipy import sparse
+        if sparse.issparse(matrix):
+            matrix = matrix.toarray()
+    except ImportError:
+        pass
+
+    matrix = np.asarray(matrix)
     if matrix.ndim == 1:
-        # One dimensional data is expected as one row, while
-        # np.savetxt writes this by default as one column.
         matrix = matrix.reshape(1, matrix.shape[0])
 
-    # Determine format for data
-    data_fmt = "%d" if np.isdtype(matrix.dtype, "integral") else "%.18e"
+    is_int = np.isdtype(matrix.dtype, "integral")
+    data_fmt = "%d" if is_int else "%.18e"
 
-    # Add index column if provided
-    if len(index.values) > 0:
+    has_index = len(index.values) > 0
+
+    if has_index:
         index_col = np.array(index.values).reshape(-1, 1)
         matrix = np.hstack([index_col, matrix])
         header = [index.name, *header]
-        # Index is always integer, data keeps its original format
         fmt = ["%d"] + [data_fmt] * (matrix.shape[1] - 1)
     else:
         fmt = data_fmt
 
     delim = ","
-    header = delim.join(header)
-    np.savetxt(filenaam, matrix, fmt=fmt, delimiter=delim, header=header, comments="")
+    header_str = delim.join(header)
 
+    # ── Fast path using pandas ──
+    try:
+        import pandas as pd
+
+        float_fmt = None if is_int else "%.18e"
+        df = pd.DataFrame(matrix)
+
+        # Restore integer formatting for the index column (hstack upcasts to float)
+        if has_index:
+            df.iloc[:, 0] = df.iloc[:, 0].astype(int)
+
+        with open(filenaam, "w", newline="") as f:
+            if header_str:
+                f.write(header_str + "\n")
+            df.to_csv(f, index=False, header=False, float_format=float_fmt)
+        return
+    except ImportError:
+        pass
+
+    # ── Fallback using np.savetxt ──
+    np.savetxt(filenaam, matrix, fmt=fmt, delimiter=delim, header=header_str, comments="")
 
 def group_income_level(naam):
     if naam[-4:] == "hoog":
@@ -178,15 +203,9 @@ def combined_group(mod, gr):
             string = "GeenRijbewijs"
     if "OV" in mod:
         if "GratisOV" in gr:
-            if string == "":
-                string = string + "GratisOV"
-            else:
-                string = string + "_GratisOV"
+            string = string + "_GratisOV" if string else "GratisOV"
         else:
-            if string == "":
-                string = string + "OV"
-            else:
-                string = string + "_OV"
+            string = string + "_OV" if string else "OV"
     if "EFiets" in mod:
         string = string + "_EFiets"
     elif "Fiets" in mod:
@@ -194,9 +213,7 @@ def combined_group(mod, gr):
     return string
 
 
-"""
-Some functions that compute general travel time / costs to avoid copying this logic
-"""
+# ── Vectorised generalized-travel-time helpers ──────────────────────
 
 
 def compute_bike_gtt(
@@ -205,11 +222,11 @@ def compute_bike_gtt(
     bike_cost_euro_per_km: float,
     tvom_factor: float,
 ):
-    return bike_time_matrix + tvom_factor * bike_distance_matrix * bike_cost_euro_per_km
+    return (bike_time_matrix + tvom_factor * bike_distance_matrix * bike_cost_euro_per_km).astype(DTYPE)
 
 
 def compute_pt_gtt(pt_time_matrix: npt.NDArray, pt_cost_matrix: npt.NDArray, tvom_factor: float):
-    return np.where(pt_time_matrix > 0.5, pt_time_matrix + tvom_factor * pt_cost_matrix, IKOB_INFINITE)
+    return np.where(pt_time_matrix > 0.5, pt_time_matrix + tvom_factor * pt_cost_matrix, IKOB_INFINITE).astype(DTYPE)
 
 
 def compute_car_gtt(
@@ -228,14 +245,51 @@ def compute_car_gtt(
         + parking_time_matrix
         + tvom_factor
         * ((var_rate + road_pricing) * car_dist + additional_costs_eurocent / 100 + parking_costs_array_eurocent / 100)
-    )
+    ).astype(DTYPE)
 
 
 def costs_public_transport(distance, pt_km_price, starting_rate, pricecap, pricecap_value):
     distance = np.where(distance < 0, 0, distance)
     distance = starting_rate + distance * pt_km_price
-
     if pricecap:
         np.clip(distance, None, pricecap_value, out=distance)
-
     return distance
+
+
+# ── Sparse helper ────────────────────────────────────────────────────
+
+def maybe_to_sparse(arr):
+    """Convert dense array to CSR sparse if USE_SPARSE is enabled."""
+    if not USE_SPARSE:
+        return arr
+    try:
+        from scipy.sparse import csr_matrix
+        return csr_matrix(arr)
+    except ImportError:
+        return arr
+
+
+def ensure_dense(arr):
+    """Ensure array is dense (for operations that need it)."""
+    try:
+        from scipy import sparse
+        if sparse.issparse(arr):
+            return arr.toarray()
+    except ImportError:
+        pass
+    return np.asarray(arr)
+
+
+def sparse_maximum(a, b):
+    """Element-wise maximum that works for both dense and sparse."""
+    try:
+        from scipy import sparse
+        if sparse.issparse(a) and sparse.issparse(b):
+            return a.maximum(b)
+        if sparse.issparse(a):
+            a = a.toarray()
+        if sparse.issparse(b):
+            b = b.toarray()
+    except ImportError:
+        pass
+    return np.maximum(a, b)
