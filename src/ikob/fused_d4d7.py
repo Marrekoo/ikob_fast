@@ -265,33 +265,53 @@ def run_fused_d4_d5_d6_d7(config, single_weights, combined_weights):
                         d5_sum,
                     )
 
-                    # ── Phase 2: D6 + D7 (reusing _mcache!) ─────
-                    safe_reach_d5 = np.where(d5_sum > 0, d5_sum, 1.0)
-                    rhs_d6 = dest_vec / safe_reach_d5
+                    # ── Phase 2: Shen A (D6) and Shen B (D7) ─────
+                    # Shen A:   A^{ig,m}_i = Σ_{g∈ig} s^{g|ig}_i · (W_wck @ (O/V))_i
+                    # Shen B:   B^{ig,m}_j = Σ_wck W_wck^T @ (Σ_{g with wck} P^g / U_wck)
+                    #
+                    # Per-wck U is already available as _d4_mv[wck] (= W_wck @ O_ig).
+                    # Per-wck P-batch is already available as _d5_batch[wck] (absolute).
 
-                    safe_reach_d4 = np.where(d4_sum > 0, d4_sum, 1.0)
-                    rhs_d7 = trav_vec / safe_reach_d4
+                    safe_V = np.where(d5_sum > 0, d5_sum, 1.0)
+                    OV_ratio = np.where(
+                        d5_sum > 0, dest_vec / safe_V, 0
+                    ).astype(DTYPE)
 
                     d6_tot = np.zeros(num_zones, dtype=DTYPE)
                     d7_tot = np.zeros(num_zones, dtype=DTYPE)
-                    _d6_mv: dict[tuple, np.ndarray] = {}
-                    _d7_mv: dict[tuple, np.ndarray] = {}
+                    _d6_WOV: dict[tuple, np.ndarray] = {}
 
-                    for ig, grp in enumerate(_GROUPS):
+                    # --- Shen A (citizen-side, D6) ---
+                    for ig_idx, grp in enumerate(_GROUPS):
                         inc = utils.group_income_level(grp)
                         if income_group != inc and income_group != "alle":
                             continue
 
                         wck = _weight_cache_key(grp, modality)
 
-                        if wck not in _d6_mv:
-                            W = _mcache[wck]       # already there from phase 1
-                            _d6_mv[wck] = W @ rhs_d6
-                            _d7_mv[wck] = W @ rhs_d7
+                        if wck not in _d6_WOV:
+                            W = _mcache[wck]
+                            _d6_WOV[wck] = np.asarray(
+                                W @ OV_ratio, dtype=DTYPE
+                            ).ravel()
 
-                        dist_col = dist_matrix[:, ig]
-                        d6_tot += _d6_mv[wck] * dist_col / safe_inc_d6
-                        d7_tot += _d7_mv[wck] * dist_col / safe_inc_d7
+                        s_g = dist_matrix[:, ig_idx]
+                        s_g_given_ig = np.where(
+                            inc_d4 > 0, s_g / safe_inc_d4, 0
+                        ).astype(DTYPE)
+                        d6_tot += s_g_given_ig * _d6_WOV[wck]
+
+                    # --- Shen B (destination-side, D7) ---
+                    # Batch P^g by wck so only one W_wck^T @ (·) per unique W.
+                    # Citizens_T holds absolute P^g_i; re-use the batching from D5.
+                    for wck, P_batch in _d5_batch.items():
+                        U_wck = _d4_mv[wck]
+                        safe_U = np.where(U_wck > 0, U_wck, 1.0)
+                        ratio = np.where(
+                            U_wck > 0, P_batch / safe_U, 0
+                        ).astype(DTYPE)
+                        W = _mcache[wck]
+                        d7_tot += np.asarray(W.T @ ratio, dtype=DTYPE).ravel()
 
                     d6_res[(income_group, modality)] = d6_tot
                     d7_res[(income_group, modality)] = d7_tot

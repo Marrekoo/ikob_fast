@@ -1,3 +1,40 @@
+"""
+Competition-adjusted accessibility — Shen (1998) two-step floating catchment.
+
+Reference
+---------
+Shen, Q. (1998). "Location characteristics of inner-city neighborhoods and
+employment accessibility of low-wage workers." Environment and Planning B:
+Planning and Design, 25(3), 345-365.
+
+Formulation (with IKOB's group structure)
+-----------------------------------------
+Let W^{g,m}_{ij} be the travel-time decay weight for group g under modality m,
+O^{ig}_j the opportunities for income class ig at destination j, P^g_i =
+s^g_i * workpop_i the absolute count of group g at origin i, and
+inc^{ig}_i = P^{ig}_i / P_i the income share per zone.  Groups share a weight
+matrix iff they share `_weight_cache_key(group, modality)`.
+
+Pass 1 (naïve potentials, already computed in D4 and D5):
+    U^{g,m}_i = sum_j  W^{g,m}_ij  ·  O^{ig(g)}_j
+    V^{ig,m}_j = sum_{g∈ig} sum_i  W^{g,m}_ij  ·  P^g_i
+
+Pass 2 (Shen competition-adjusted accessibility):
+
+    Citizen-side A (this is D6, a.k.a. `competition_on_destinations`):
+        A^{g,m}_i  = sum_j  W^{g,m}_ij  ·  O^{ig(g)}_j / V^{ig,m}_j
+        A^{ig,m}_i = sum_{g∈ig}  s^{g|ig}_i  ·  A^{g,m}_i          (weighted AVG)
+
+    Destination-side B (this is D7, a.k.a. `competition_on_citizens`):
+        B^{g,m}_j  = sum_i  W^{g,m}_ij  ·  P^g_i / U^{g,m}_i
+                   = ( (W^{g,m})^T @ (P^g / U^{g,m}) )_j
+        B^{ig,m}_j = sum_{g∈ig}  B^{g,m}_j                         (plain SUM)
+
+Note on fuel-kind blending: for Auto-based groups the weight matrix returned by
+`get_weight_matrix` is already a fuel-share-blended W, so the Shen aggregation
+happens on the blended matrix.  This matches how D4 computes U.
+"""
+
 import logging
 from pathlib import Path
 
@@ -10,8 +47,32 @@ from ikob.utils import DTYPE
 logger = logging.getLogger(__name__)
 
 
+# ── Group / modality definitions (shared with D4, D5) ────────────────
+
+_BASE_GROUPS = [
+    "GratisAuto", "GratisAuto_GratisOV",
+    "WelAuto_GratisOV", "WelAuto_vkAuto", "WelAuto_vkNeutraal",
+    "WelAuto_vkFiets", "WelAuto_vkOV",
+    "GeenAuto_GratisOV", "GeenAuto_vkNeutraal",
+    "GeenAuto_vkFiets", "GeenAuto_vkOV",
+    "GeenRijbewijs_GratisOV", "GeenRijbewijs_vkNeutraal",
+    "GeenRijbewijs_vkFiets", "GeenRijbewijs_vkOV",
+]
+
+_INCOME_LEVELS = ["laag", "middellaag", "middelhoog", "hoog"]
+
+_MODALITIES = [
+    "Fiets", "Auto", "OV", "Auto_Fiets",
+    "OV_Fiets", "Auto_OV", "Auto_OV_Fiets",
+]
+
+_GROUPS = [f"{bg}_{ig}" for ig in _INCOME_LEVELS for bg in _BASE_GROUPS]
+
+
+# ── Public helpers (kept for import compatibility with D4, D5) ───────
+
 def compute_income_distributions(citizens_or_destinations):
-    """Vectorised income distribution."""
+    """Per-zone income shares: result[i, ig] = X^{ig}_i / X_i."""
     arr = np.asarray(citizens_or_destinations, dtype=DTYPE)
     totals = arr.sum(axis=1, keepdims=True)
     safe_totals = np.where(totals > 0, totals, 1.0)
@@ -21,8 +82,8 @@ def compute_income_distributions(citizens_or_destinations):
 
 
 def _weight_cache_key(group, modality):
-    """Deterministic key that uniquely identifies a weight matrix
-    within a fixed (part_of_day, income, regime, motive, K) context."""
+    """Canonical key identifying a weight matrix within a fixed
+    (part_of_day, income, regime, motive, K) context."""
     preference = utils.find_preference(group, modality)
     if modality in ("Fiets", "EFiets"):
         return (modality, "Fiets" if preference == "Fiets" else "")
@@ -40,11 +101,7 @@ def get_weight_matrix(
     *,
     _matrix_cache: dict | None = None,
 ):
-    """Fetch the weight matrix for a (group, modality) combination.
-
-    If ``_matrix_cache`` is provided, the matrix is cached by a
-    deterministic key to avoid redundant lookups/blending.
-    """
+    """Fetch the (possibly fuel-blended) weight matrix for (group, modality)."""
     cache_key = _weight_cache_key(group, modality)
 
     if _matrix_cache is not None and cache_key in _matrix_cache:
@@ -54,10 +111,9 @@ def get_weight_matrix(
 
     if modality in ("Fiets", "EFiets"):
         preference_bike = "Fiets" if preference == "Fiets" else ""
-        key = DataKey(f"{modality}_vk", part_of_day=part_of_day, regime=regime, motive=motive,
-                      preference=preference_bike, income=income)
+        key = DataKey(f"{modality}_vk", part_of_day=part_of_day, regime=regime,
+                      motive=motive, preference=preference_bike, income=income)
         matrix = single_weights.get(key)
-
     else:
         sg = utils.single_group(modality, group)
         cg = utils.combined_group(modality, group)
@@ -66,22 +122,23 @@ def get_weight_matrix(
             subtopic = "" if modality == "Auto" else "combinaties"
             weights = single_weights if modality == "Auto" else combined_weights
             string = sg if modality == "Auto" else cg
-            key_f = DataKey(f"{string}_vk", part_of_day=part_of_day, regime=regime, motive=motive,
-                            preference=preference, income=income, subtopic=subtopic, fuel_kind="fossiel")
-            key_e = DataKey(f"{string}_vk", part_of_day=part_of_day, regime=regime, motive=motive,
-                            preference=preference, income=income, subtopic=subtopic, fuel_kind="elektrisch")
-            matrix_fossil = weights.get(key_f)
-            matrix_electric = weights.get(key_e)
-            matrix = ratio_electric * matrix_electric + (1 - ratio_electric) * matrix_fossil
-
+            key_f = DataKey(f"{string}_vk", part_of_day=part_of_day, regime=regime,
+                            motive=motive, preference=preference, income=income,
+                            subtopic=subtopic, fuel_kind="fossiel")
+            key_e = DataKey(f"{string}_vk", part_of_day=part_of_day, regime=regime,
+                            motive=motive, preference=preference, income=income,
+                            subtopic=subtopic, fuel_kind="elektrisch")
+            m_fossil = weights.get(key_f)
+            m_electric = weights.get(key_e)
+            matrix = ratio_electric * m_electric + (1 - ratio_electric) * m_fossil
         elif modality in ("Auto", "OV"):
-            key = DataKey(f"{sg}_vk", part_of_day=part_of_day, regime=regime, motive=motive,
-                          preference=preference, income=income)
+            key = DataKey(f"{sg}_vk", part_of_day=part_of_day, regime=regime,
+                          motive=motive, preference=preference, income=income)
             matrix = single_weights.get(key)
-
         else:
-            key = DataKey(f"{cg}_vk", part_of_day=part_of_day, regime=regime, motive=motive,
-                          preference=preference, income=income, subtopic="combinaties")
+            key = DataKey(f"{cg}_vk", part_of_day=part_of_day, regime=regime,
+                          motive=motive, preference=preference, income=income,
+                          subtopic="combinaties")
             matrix = combined_weights.get(key)
 
     if _matrix_cache is not None:
@@ -89,185 +146,226 @@ def get_weight_matrix(
     return matrix
 
 
-# ── Legacy step functions (kept for selective-skip fallback) ─────────
+# ── Sparse/dense safe matvec helpers ─────────────────────────────────
 
-def competition_on_destinations(config, single_weights, combined_weights, origins):
-    """Section D6."""
-    logger.info("Starting step: Compute competition on destinations")
-    return competition(config, single_weights, combined_weights, origins, citizens=False)
-
-
-def competition_on_citizens(config, single_weights, combined_weights, origins):
-    """Section D7."""
-    logger.info("Starting step: Compute competition on citizens")
-    return competition(config, single_weights, combined_weights, origins, citizens=True)
+def _matvec(W, v):
+    """Compute W @ v, returning a 1-D float32 ndarray regardless of W's type."""
+    out = W @ v
+    return np.asarray(out, dtype=DTYPE).ravel()
 
 
-def competition(config, single_weights, combined_weights, origins, citizens=True):
-    if citizens:
-        logger.info("Competition for citizens.")
-    else:
-        logger.info("Competition for destinations.")
+def _matvec_T(W, v):
+    """Compute W.T @ v, returning a 1-D float32 ndarray."""
+    out = W.T @ v
+    return np.asarray(out, dtype=DTYPE).ravel()
+
+
+# ── Public steps D6 and D7 ───────────────────────────────────────────
+
+def competition_on_destinations(config, single_weights, combined_weights,
+                                naive_origins: DataSource):
+    """
+    Section D6 — Shen citizen-side accessibility A_i.
+
+    Uses D5's output V^{ig,m}_j = naive_origins["Totaal", pod, ig, car_group, m]
+    as the competition denominator.  Result is indexed by origin.
+    """
+    logger.info("Starting step: Shen citizen-side accessibility A_i (D6).")
+    return _run_shen(config, single_weights, combined_weights,
+                     naive_origins=naive_origins, side="citizen")
+
+
+def competition_on_citizens(config, single_weights, combined_weights,
+                            naive_destinations: DataSource):
+    """
+    Section D7 — Shen destination-side accessibility B_j.
+
+    Per-group U^{g,m}_i is recomputed internally (one matmul per unique
+    weight key) to satisfy Shen's per-group normalisation.  The
+    ``naive_destinations`` argument is accepted for API compatibility but
+    only its config/context is used.  Result is indexed by destination.
+    """
+    logger.info("Starting step: Shen destination-side accessibility B_j (D7).")
+    return _run_shen(config, single_weights, combined_weights,
+                     naive_destinations=naive_destinations, side="destination")
+
+
+# ── Core Shen pass ───────────────────────────────────────────────────
+
+def _run_shen(config, single_weights, combined_weights,
+              naive_origins=None, naive_destinations=None, side=""):
+    assert side in ("citizen", "destination")
+    is_citizen_side = (side == "citizen")
 
     project_config = config["project"]
     skims_config = config["skims"]
     distribution_config = config["verdeling"]
-    part_of_days = skims_config["dagsoort"]
     advanced_config = config["geavanceerd"]
 
+    part_of_days = skims_config["dagsoort"]
     scenario = project_config["verstedelijkingsscenario"]
-    regimes = project_config["beprijzingsregime"]
+    regime = project_config["beprijzingsregime"]
     motive_name = project_config["motief"]["naam"]
     traveling_population_path = Path(project_config["motief"]["reizende populatie"])
     destinations_path = Path(project_config["motief"]["bestemmingsplaatsen"])
     car_possession_groups = advanced_config["welke_groepen"]
     electric_percentage = distribution_config["Percelektrisch"]
 
-    groups = [
-        "GratisAuto_laag", "GratisAuto_GratisOV_laag",
-        "WelAuto_GratisOV_laag", "WelAuto_vkAuto_laag", "WelAuto_vkNeutraal_laag",
-        "WelAuto_vkFiets_laag", "WelAuto_vkOV_laag",
-        "GeenAuto_GratisOV_laag", "GeenAuto_vkNeutraal_laag", "GeenAuto_vkFiets_laag", "GeenAuto_vkOV_laag",
-        "GeenRijbewijs_GratisOV_laag", "GeenRijbewijs_vkNeutraal_laag",
-        "GeenRijbewijs_vkFiets_laag", "GeenRijbewijs_vkOV_laag",
-        "GratisAuto_middellaag", "GratisAuto_GratisOV_middellaag",
-        "WelAuto_GratisOV_middellaag", "WelAuto_vkAuto_middellaag", "WelAuto_vkNeutraal_middellaag",
-        "WelAuto_vkFiets_middellaag", "WelAuto_vkOV_middellaag",
-        "GeenAuto_GratisOV_middellaag", "GeenAuto_vkNeutraal_middellaag",
-        "GeenAuto_vkFiets_middellaag", "GeenAuto_vkOV_middellaag",
-        "GeenRijbewijs_GratisOV_middellaag", "GeenRijbewijs_vkNeutraal_middellaag",
-        "GeenRijbewijs_vkFiets_middellaag", "GeenRijbewijs_vkOV_middellaag",
-        "GratisAuto_middelhoog", "GratisAuto_GratisOV_middelhoog",
-        "WelAuto_GratisOV_middelhoog", "WelAuto_vkAuto_middelhoog", "WelAuto_vkNeutraal_middelhoog",
-        "WelAuto_vkFiets_middelhoog", "WelAuto_vkOV_middelhoog",
-        "GeenAuto_GratisOV_middelhoog", "GeenAuto_vkNeutraal_middelhoog",
-        "GeenAuto_vkFiets_middelhoog", "GeenAuto_vkOV_middelhoog",
-        "GeenRijbewijs_GratisOV_middelhoog", "GeenRijbewijs_vkNeutraal_middelhoog",
-        "GeenRijbewijs_vkFiets_middelhoog", "GeenRijbewijs_vkOV_middelhoog",
-        "GratisAuto_hoog", "GratisAuto_GratisOV_hoog",
-        "WelAuto_GratisOV_hoog", "WelAuto_vkAuto_hoog", "WelAuto_vkNeutraal_hoog",
-        "WelAuto_vkFiets_hoog", "WelAuto_vkOV_hoog",
-        "GeenAuto_GratisOV_hoog", "GeenAuto_vkNeutraal_hoog",
-        "GeenAuto_vkFiets_hoog", "GeenAuto_vkOV_hoog",
-        "GeenRijbewijs_GratisOV_hoog", "GeenRijbewijs_vkNeutraal_hoog",
-        "GeenRijbewijs_vkFiets_hoog", "GeenRijbewijs_vkOV_hoog",
-    ]
-
-    modalities = ["Fiets", "Auto", "OV", "Auto_Fiets", "OV_Fiets", "Auto_OV", "Auto_OV_Fiets"]
-    income_groups = ["laag", "middellaag", "middelhoog", "hoog"]
-    headstring = list(modalities)
-
     segs_source = SegsSource(config)
-
     traveling_population = np.asarray(
-        segs_source.read(traveling_population_path.name, scenario=scenario), dtype=DTYPE
-    )
+        segs_source.read(traveling_population_path.name, scenario=scenario), dtype=DTYPE)
     destinations = np.asarray(
-        segs_source.read(destinations_path.name, scenario=scenario), dtype=DTYPE
-    )
+        segs_source.read(destinations_path.name, scenario=scenario), dtype=DTYPE)
 
-    income_distributions = compute_income_distributions(traveling_population if citizens else destinations)
-    subtopic_competition = "inwoners" if citizens else "bestemmingen"
-    competition_filename_suffix = "Pot" if citizens else "Ontpl"
+    num_zones = len(traveling_population)
+    working_population = traveling_population.sum(axis=1)
+
+    # inc^{ig}_i — citizen income share per zone (for the A weighted average)
+    income_dist_citizens = compute_income_distributions(traveling_population)
+
     competitions = DataSource(config, DataType.COMPETITION)
 
-    citizens_or_destinations = traveling_population if citizens else destinations
-    num_zones = len(citizens_or_destinations)
+    subtopic = "bestemmingen" if is_citizen_side else "inwoners"
+    conc_prefix = "Ontpl" if is_citizen_side else "Pot"
 
-    for car_possession_group in car_possession_groups:
-        distribution_matrix = np.asarray(segs_source.read(
-            "Verdeling_over_groepen", type_caster=float, scenario=scenario, group=motive_name,
-            modifier="alleen_autobezit" if car_possession_group == "alleen autobezit" else "",
+    for car_group in car_possession_groups:
+        dist_matrix = np.asarray(segs_source.read(
+            "Verdeling_over_groepen", type_caster=float, scenario=scenario,
+            group=motive_name,
+            modifier="alleen_autobezit" if car_group == "alleen autobezit" else "",
             has_index_column=True,
         ), dtype=DTYPE)
 
-        for part_of_day in part_of_days:
-            for i_income_group, income_group in enumerate(income_groups):
-                general_possibility_totals = []
+        # P^g_i = s^g_i · workpop_i  (absolute citizens per group per zone)
+        citizens_matrix = dist_matrix * working_population[:, np.newaxis]
 
-                for modality in modalities:
-                    key = DataKey("Totaal", part_of_day=part_of_day, motive=motive_name, modality=modality,
-                                  income=income_group, group=car_possession_group)
-                    reach = origins.get(key)
-                    safe_reach = np.where(reach > 0, reach, 1.0)
+        for pod in part_of_days:
+            # per-modality list of (N,) arrays – one entry per income level,
+            # for the across-income CSV write at the end of each pod
+            income_stacks: dict[str, list] = {m: [] for m in _MODALITIES}
 
-                    income_distribution = income_distributions[:, i_income_group]
-                    safe_income_dist = np.where(income_distribution > 0, income_distribution, 1.0)
+            for i_ig, ig in enumerate(_INCOME_LEVELS):
+                K = electric_percentage.get(ig) / 100
+                O_ig = destinations[:, i_ig].astype(DTYPE)        # O^{ig}_j
+                inc_ig = income_dist_citizens[:, i_ig]             # inc^{ig}_i
+                safe_inc_ig = np.where(inc_ig > 0, inc_ig, 1.0)
 
-                    rhs = citizens_or_destinations.T[i_income_group] / safe_reach
+                per_modality_results = []
 
-                    K = electric_percentage.get(income_group) / 100
+                for modality in _MODALITIES:
+                    result = np.zeros(num_zones, dtype=DTYPE)
 
-                    _matrix_cache = {}
-                    _matmul_cache = {}
-                    competition_total = np.zeros(num_zones, dtype=DTYPE)
+                    # Per-modality caches (shared between groups with same wck)
+                    _matrix_cache: dict = {}
+                    _U_cache: dict = {}      # wck -> W @ O_ig  (= U^{g,m}_i)
+                    _WOV_cache: dict = {}    # wck -> W @ (O/V) (for A)
+                    B_batches: dict = {}     # wck -> Σ P^g over groups sharing wck
 
-                    for i_group, group in enumerate(groups):
-                        distribution = distribution_matrix[:, i_group]
-                        income = utils.group_income_level(group)
-                        if income_group != income and income_group != "alle":
+                    if is_citizen_side:
+                        # Fetch V^{ig,m}_j from D5 and build O/V once per (ig, m)
+                        key_V = DataKey(
+                            "Totaal", part_of_day=pod, income=ig,
+                            group=car_group, motive=motive_name, modality=modality,
+                        )
+                        V_igm = np.asarray(naive_origins.get(key_V), dtype=DTYPE)
+                        OV_ratio = np.where(
+                            V_igm > 0, O_ig / np.where(V_igm > 0, V_igm, 1.0), 0
+                        ).astype(DTYPE)
+
+                    for i_grp, grp in enumerate(_GROUPS):
+                        grp_income = utils.group_income_level(grp)
+                        if ig != grp_income and ig != "alle":
                             continue
 
-                        wck = _weight_cache_key(group, modality)
+                        wck = _weight_cache_key(grp, modality)
 
-                        if wck not in _matmul_cache:
-                            matrix = get_weight_matrix(
-                                single_weights, combined_weights, group, modality,
-                                motive_name, regimes, part_of_day, income, K,
+                        if wck not in _matrix_cache:
+                            get_weight_matrix(
+                                single_weights, combined_weights,
+                                grp, modality, motive_name, regime,
+                                pod, grp_income, K,
                                 _matrix_cache=_matrix_cache,
                             )
-                            _matmul_cache[wck] = matrix @ rhs
+                        W = _matrix_cache[wck]
 
-                        competition_val = _matmul_cache[wck]
-                        competition_total += competition_val * distribution / safe_income_dist
+                        if is_citizen_side:
+                            # A^{g,m}_i  = (W @ (O/V))_i,  shared across g sharing wck
+                            if wck not in _WOV_cache:
+                                _WOV_cache[wck] = _matvec(W, OV_ratio)
 
-                    key = DataKey(
-                        id="Totaal", part_of_day=part_of_day, subtopic=subtopic_competition,
-                        income=income_group, motive=motive_name, modality=modality,
-                        group=car_possession_group, is_temporary=True,
+                            # Within-income share  s^{g|ig}_i = s^g_i / inc^{ig}_i
+                            s_g = dist_matrix[:, i_grp]
+                            s_g_given_ig = np.where(
+                                inc_ig > 0, s_g / safe_inc_ig, 0
+                            ).astype(DTYPE)
+                            result += s_g_given_ig * _WOV_cache[wck]
+                        else:
+                            # Destination side: batch P^g by wck for one matvec_T later
+                            if wck not in _U_cache:
+                                _U_cache[wck] = _matvec(W, O_ig)   # U^{g,m}_i
+                            B_batches.setdefault(
+                                wck, np.zeros(num_zones, dtype=DTYPE)
+                            )
+                            B_batches[wck] += citizens_matrix[:, i_grp]
+
+                    if not is_citizen_side:
+                        # B^{ig,m}_j = Σ_wck W_wck^T @ (Σ_g P^g / U_wck)
+                        for wck, P_batch in B_batches.items():
+                            U_wck = _U_cache[wck]
+                            safe_U = np.where(U_wck > 0, U_wck, 1.0)
+                            ratio = np.where(
+                                U_wck > 0, P_batch / safe_U, 0
+                            ).astype(DTYPE)
+                            result += _matvec_T(_matrix_cache[wck], ratio)
+
+                    # Cache per-income per-modality result (temporary)
+                    temp_key = DataKey(
+                        id="Totaal", part_of_day=pod, subtopic=subtopic,
+                        income=ig, motive=motive_name, modality=modality,
+                        group=car_group, is_temporary=True,
                     )
-                    competitions.set(key, competition_total)
+                    competitions.set(temp_key, result)
+                    per_modality_results.append(result)
+                    income_stacks[modality].append(result)
 
-                    general_possibility_totals.append(competition_total)
-                    general_totals_transpose = np.column_stack(general_possibility_totals)
-                    key = DataKey(
-                        id=f"{competition_filename_suffix}_conc", part_of_day=part_of_day,
-                        subtopic=subtopic_competition, income=income_group, motive=motive_name,
-                        group=car_possession_group, index=DataKey.zone_index(num_zones),
-                    )
-                    competitions.write_csv(general_totals_transpose, key, header=headstring)
+                # ── Per-income CSV: rows = zones, cols = modalities ──
+                per_income_matrix = np.column_stack(per_modality_results)
+                key = DataKey(
+                    id=f"{conc_prefix}_conc", part_of_day=pod, subtopic=subtopic,
+                    income=ig, motive=motive_name, group=car_group,
+                    index=DataKey.zone_index(num_zones),
+                )
+                competitions.write_csv(per_income_matrix, key,
+                                       header=list(_MODALITIES))
 
-            header = ["laag", "middellaag", "middelhoog", "hoog"]
-            for modality in modalities:
-                general_matrix = []
-                for income_group in income_groups:
-                    key = DataKey("Totaal", part_of_day=part_of_day, motive=motive_name, modality=modality,
-                                  income=income_group, subtopic=subtopic_competition, group=car_possession_group)
-                    general_matrix.append(competitions.get(key))
-                general_totals_transpose = np.column_stack(general_matrix)
+            # ── Per-modality CSV across incomes: rows = zones, cols = incomes ──
+            income_header = list(_INCOME_LEVELS)
+            for modality in _MODALITIES:
+                stacked = np.column_stack(income_stacks[modality])   # (N, 4)
 
-                if citizens:
-                    mask = destinations > 0
-                else:
+                key = DataKey(
+                    id=f"{conc_prefix}_conc", part_of_day=pod, subtopic=subtopic,
+                    motive=motive_name, modality=modality, group=car_group,
+                    index=DataKey.zone_index(num_zones),
+                )
+                competitions.write_csv(stacked, key, header=income_header)
+
+                # "Product" file: accessibility × counterpart mass per zone.
+                #   citizen side:     A^{ig,m}_i · P^{ig}_i        (mask P > 0)
+                #   destination side: B^{ig,m}_j · O^{ig}_j        (mask O > 0)
+                if is_citizen_side:
+                    mass = traveling_population
                     mask = traveling_population > 0
-                general_matrix_product = np.where(
-                    mask,
-                    general_totals_transpose * citizens_or_destinations,
-                    0,
-                )
+                else:
+                    mass = destinations
+                    mask = destinations > 0
+                product = np.where(mask, stacked * mass, 0)
 
                 key = DataKey(
-                    id=f"{competition_filename_suffix}_conc", part_of_day=part_of_day,
-                    subtopic=subtopic_competition, motive=motive_name, modality=modality,
-                    group=car_possession_group, index=DataKey.zone_index(num_zones),
+                    id=f"{conc_prefix}_concproduct", part_of_day=pod,
+                    subtopic=subtopic, motive=motive_name, modality=modality,
+                    group=car_group, index=DataKey.zone_index(num_zones),
                 )
-                competitions.write_csv(general_totals_transpose, key, header=header)
-
-                key = DataKey(
-                    id=f"{competition_filename_suffix}_concproduct", part_of_day=part_of_day,
-                    subtopic=subtopic_competition, motive=motive_name, modality=modality,
-                    group=car_possession_group, index=DataKey.zone_index(num_zones),
-                )
-                competitions.write_csv(general_matrix_product, key, header=header)
+                competitions.write_csv(product, key, header=income_header)
 
     return competitions
