@@ -15,6 +15,26 @@ Key benefits
 * CSV writes are offloaded to background threads via ``AsyncCsvWriter``.
 * Income groups within a (car-group, part-of-day) pair are processed in
   parallel using a ``ThreadPoolExecutor``.
+
+Correctness notes
+~~~~~~~~~~~~~~~~~
+* D5 fuel blending: the reference splits WelAuto/A-combined citizens into
+  fossil/electric batches and multiplies each with the unblended matrix.
+  Here we use the blended matrix directly, which is algebraically
+  identical:  W_f^T (K_f c) + W_e^T (K_e c) = (K_f W_f + K_e W_e)^T c.
+  Only float32 rounding order differs; validate with np.allclose.
+* Output formatting mirrors the reference steps exactly:
+  - D4 "Ontpl_totaal" (per income and across income): rounded int.
+  - D4 "Ontpl_totaalproduct": rounded int (as in reachable_destinations).
+  - D5 "Pot_totaal": rounded int; "Pot_totaalproduct": raw float
+    (as in reachable_population – the asymmetry is inherited on purpose).
+  - D6/D7 "conc" and "concproduct": raw float (as in competition).
+* Shen products:
+  - D6 (citizen side):     A · traveling_population, masked on P > 0.
+  - D7 (destination side): B · destinations,         masked on O > 0.
+* This kernel processes all four income levels; it does NOT honor a
+  subset in config["project"]["welke_inkomensgroepen"] (the reference
+  steps misalign columns for subsets anyway – fix that first if needed).
 """
 
 import logging
@@ -25,11 +45,7 @@ import numpy as np
 
 import ikob.utils as utils
 from ikob.async_writer import AsyncCsvWriter
-from ikob.competition import (
-    _weight_cache_key,
-    compute_income_distributions,
-    get_weight_matrix,
-)
+from ikob.competition import _weight_cache_key, get_weight_matrix
 from ikob.datasource import DataKey, DataSource, DataType, SegsSource
 from ikob.utils import DTYPE
 
@@ -119,21 +135,17 @@ def run_fused_d4_d5_d6_d7(config, single_weights, combined_weights):
     num_zones = len(traveling_population)
     working_population = traveling_population.sum(axis=1)
 
-    # D4 income distributions (from travelling population)
+    # Citizen-side income distributions (from travelling population).
+    # Used for: D4 normalisation AND the D6 Shen-A weighted average.
+    # NOTE: destination-based income shares must NOT be used for D6 –
+    # the reference (competition.py) uses citizen shares there.
     trav_totals = traveling_population.sum(axis=1, keepdims=True)
     safe_trav_totals = np.where(trav_totals > 0, trav_totals, 1.0)
-    income_dist_d4 = traveling_population / safe_trav_totals
-    income_dist_d4[trav_totals.ravel() <= 0] = 0.0
-    income_dist_d4_T = income_dist_d4.T                        # (4, N)
+    income_dist_citizens = traveling_population / safe_trav_totals
+    income_dist_citizens[trav_totals.ravel() <= 0] = 0.0
+    income_dist_citizens_T = income_dist_citizens.T            # (4, N)
 
     destinations_T = destinations_segs.T                       # (4, N)
-    traveling_pop_T = traveling_population.T                    # (4, N)
-
-    # D6 income distributions (from destinations)
-    income_dist_d6 = compute_income_distributions(destinations_segs)  # (N, 4)
-
-    # D7 income distributions (from travelling population, same as D4)
-    income_dist_d7 = compute_income_distributions(traveling_population)  # (N, 4)
 
     # ── Output containers ────────────────────────────────────────────
     potencies = DataSource(config, DataType.DESTINATIONS)      # D4
@@ -170,6 +182,7 @@ def run_fused_d4_d5_d6_d7(config, single_weights, combined_weights):
         for pod in part_of_days:
             # Accumulators filled by the per-income-group workers.
             # Keys: (income_group, modality) → 1-D float32 array.
+            # Threads write disjoint keys, so plain dicts are safe.
             d4_res: dict[tuple, np.ndarray] = {}
             d5_res: dict[tuple, np.ndarray] = {}
             d6_res: dict[tuple, np.ndarray] = {}
@@ -180,19 +193,10 @@ def run_fused_d4_d5_d6_d7(config, single_weights, combined_weights):
             def _cell(i_ig: int, income_group: str):
                 K = electric_percentage.get(income_group) / 100
 
-                # D4 vectors
-                dest_vec = destinations_T[i_ig]
-                inc_d4 = income_dist_d4_T[i_ig]
-                safe_inc_d4 = np.where(inc_d4 > 0, inc_d4, 1.0)
-
-                # D6 vectors
-                inc_d6 = income_dist_d6[:, i_ig]
-                safe_inc_d6 = np.where(inc_d6 > 0, inc_d6, 1.0)
-
-                # D7 vectors
-                inc_d7 = income_dist_d7[:, i_ig]
-                safe_inc_d7 = np.where(inc_d7 > 0, inc_d7, 1.0)
-                trav_vec = traveling_pop_T[i_ig]
+                # D4 / D6 vectors
+                dest_vec = destinations_T[i_ig]                # O^{ig}_j
+                inc_ig = income_dist_citizens_T[i_ig]          # inc^{ig}_i
+                safe_inc_ig = np.where(inc_ig > 0, inc_ig, 1.0)
 
                 d4_mod_cols = []
                 d5_mod_cols = []
@@ -209,14 +213,14 @@ def run_fused_d4_d5_d6_d7(config, single_weights, combined_weights):
                     _d4_mv: dict[tuple, np.ndarray] = {}
                     _d5_batch: dict[tuple, np.ndarray] = {}
 
-                    for ig, grp in enumerate(_GROUPS):
+                    for i_grp, grp in enumerate(_GROUPS):
                         inc = utils.group_income_level(grp)
                         if income_group != inc and income_group != "alle":
                             continue
 
                         wck = _weight_cache_key(grp, modality)
 
-                        # Ensure W is cached
+                        # Ensure W is cached (blended for Auto-based groups)
                         if wck not in _mcache:
                             get_weight_matrix(
                                 single_weights, combined_weights,
@@ -227,21 +231,25 @@ def run_fused_d4_d5_d6_d7(config, single_weights, combined_weights):
 
                         # D4: accumulate weighted matmul
                         if wck not in _d4_mv:
-                            _d4_mv[wck] = _mcache[wck] @ dest_vec
+                            _d4_mv[wck] = np.asarray(
+                                _mcache[wck] @ dest_vec, dtype=DTYPE
+                            ).ravel()
 
-                        poss = _d4_mv[wck] * dist_matrix[:, ig]
-                        poss = poss / safe_inc_d4
-                        poss[inc_d4 <= 0] = 0
+                        poss = _d4_mv[wck] * dist_matrix[:, i_grp]
+                        poss = poss / safe_inc_ig
+                        poss[inc_ig <= 0] = 0
                         d4_sum += poss
 
                         # D5: batch citizens by weight key
                         if wck not in _d5_batch:
                             _d5_batch[wck] = np.zeros(num_zones, dtype=DTYPE)
-                        _d5_batch[wck] += citizens_T[ig]
+                        _d5_batch[wck] += citizens_T[i_grp]
 
-                    # D5 batched matmuls
+                    # D5 batched matmuls (blended W – see module docstring)
                     for wck, cit_batch in _d5_batch.items():
-                        d5_sum += _mcache[wck].T @ cit_batch
+                        d5_sum += np.asarray(
+                            _mcache[wck].T @ cit_batch, dtype=DTYPE
+                        ).ravel()
 
                     # Store totals for across-income aggregation
                     d4_res[(income_group, modality)] = d4_sum
@@ -282,7 +290,7 @@ def run_fused_d4_d5_d6_d7(config, single_weights, combined_weights):
                     _d6_WOV: dict[tuple, np.ndarray] = {}
 
                     # --- Shen A (citizen-side, D6) ---
-                    for ig_idx, grp in enumerate(_GROUPS):
+                    for i_grp, grp in enumerate(_GROUPS):
                         inc = utils.group_income_level(grp)
                         if income_group != inc and income_group != "alle":
                             continue
@@ -295,15 +303,14 @@ def run_fused_d4_d5_d6_d7(config, single_weights, combined_weights):
                                 W @ OV_ratio, dtype=DTYPE
                             ).ravel()
 
-                        s_g = dist_matrix[:, ig_idx]
+                        s_g = dist_matrix[:, i_grp]
                         s_g_given_ig = np.where(
-                            inc_d4 > 0, s_g / safe_inc_d4, 0
+                            inc_ig > 0, s_g / safe_inc_ig, 0
                         ).astype(DTYPE)
                         d6_tot += s_g_given_ig * _d6_WOV[wck]
 
                     # --- Shen B (destination-side, D7) ---
                     # Batch P^g by wck so only one W_wck^T @ (·) per unique W.
-                    # Citizens_T holds absolute P^g_i; re-use the batching from D5.
                     for wck, P_batch in _d5_batch.items():
                         U_wck = _d4_mv[wck]
                         safe_U = np.where(U_wck > 0, U_wck, 1.0)
@@ -344,7 +351,7 @@ def run_fused_d4_d5_d6_d7(config, single_weights, combined_weights):
 
                 # ── Per-income CSV writes ────────────────────────
 
-                # D4 per-income (all modalities)
+                # D4 per-income (all modalities) – rounded int (reference)
                 _async_write(
                     writer, potencies,
                     np.round(np.column_stack(d4_mod_cols)).astype(int),
@@ -356,7 +363,7 @@ def run_fused_d4_d5_d6_d7(config, single_weights, combined_weights):
                     header=modality_header,
                 )
 
-                # D5 per-income
+                # D5 per-income – rounded int (reference)
                 _async_write(
                     writer, origins,
                     np.round(np.column_stack(d5_mod_cols)).astype(int),
@@ -368,7 +375,7 @@ def run_fused_d4_d5_d6_d7(config, single_weights, combined_weights):
                     header=modality_header,
                 )
 
-                # D6 per-income
+                # D6 per-income – raw float (reference)
                 _async_write(
                     writer, comp_dest,
                     np.column_stack(d6_mod_cols),
@@ -381,7 +388,7 @@ def run_fused_d4_d5_d6_d7(config, single_weights, combined_weights):
                     header=modality_header,
                 )
 
-                # D7 per-income
+                # D7 per-income – raw float (reference)
                 _async_write(
                     writer, comp_cit,
                     np.column_stack(d7_mod_cols),
@@ -410,8 +417,7 @@ def run_fused_d4_d5_d6_d7(config, single_weights, combined_weights):
 
                 # -- D4 across income --
                 d4_cols = [
-                    d4_res.get((ig, modality), np.zeros(num_zones, dtype=DTYPE))
-                    for ig in _INCOME_LEVELS
+                    d4_res[(ig, modality)] for ig in _INCOME_LEVELS
                 ]
                 d4_stack = np.column_stack(d4_cols)
 
@@ -425,12 +431,15 @@ def run_fused_d4_d5_d6_d7(config, single_weights, combined_weights):
                     ),
                     header=income_header,
                 )
+                # Reference (reachable_destinations) rounds this product.
                 _async_write(
                     writer, potencies,
-                    np.where(
-                        traveling_population > 0,
-                        d4_stack * traveling_population, 0,
-                    ),
+                    np.round(
+                        np.where(
+                            traveling_population > 0,
+                            d4_stack * traveling_population, 0,
+                        )
+                    ).astype(int),
                     DataKey(
                         "Ontpl_totaalproduct", part_of_day=pod,
                         group=car_group, motive=motive_name,
@@ -441,8 +450,7 @@ def run_fused_d4_d5_d6_d7(config, single_weights, combined_weights):
 
                 # -- D5 across income --
                 d5_cols = [
-                    d5_res.get((ig, modality), np.zeros(num_zones, dtype=DTYPE))
-                    for ig in _INCOME_LEVELS
+                    d5_res[(ig, modality)] for ig in _INCOME_LEVELS
                 ]
                 d5_stack = np.column_stack(d5_cols)
 
@@ -456,6 +464,7 @@ def run_fused_d4_d5_d6_d7(config, single_weights, combined_weights):
                     ),
                     header=income_header,
                 )
+                # Reference (reachable_population) does NOT round this one.
                 _async_write(
                     writer, origins,
                     np.where(
@@ -472,8 +481,7 @@ def run_fused_d4_d5_d6_d7(config, single_weights, combined_weights):
 
                 # -- D6 across income --
                 d6_cols = [
-                    d6_res.get((ig, modality), np.zeros(num_zones, dtype=DTYPE))
-                    for ig in _INCOME_LEVELS
+                    d6_res[(ig, modality)] for ig in _INCOME_LEVELS
                 ]
                 d6_stack = np.column_stack(d6_cols)
 
@@ -488,11 +496,12 @@ def run_fused_d4_d5_d6_d7(config, single_weights, combined_weights):
                     ),
                     header=income_header,
                 )
+                # Citizen side: A · traveling_population, masked on P > 0.
                 _async_write(
                     writer, comp_dest,
                     np.where(
                         traveling_population > 0,
-                        d6_stack * destinations_segs, 0,
+                        d6_stack * traveling_population, 0,
                     ),
                     DataKey(
                         "Ontpl_concproduct", part_of_day=pod,
@@ -505,8 +514,7 @@ def run_fused_d4_d5_d6_d7(config, single_weights, combined_weights):
 
                 # -- D7 across income --
                 d7_cols = [
-                    d7_res.get((ig, modality), np.zeros(num_zones, dtype=DTYPE))
-                    for ig in _INCOME_LEVELS
+                    d7_res[(ig, modality)] for ig in _INCOME_LEVELS
                 ]
                 d7_stack = np.column_stack(d7_cols)
 
@@ -521,11 +529,12 @@ def run_fused_d4_d5_d6_d7(config, single_weights, combined_weights):
                     ),
                     header=income_header,
                 )
+                # Destination side: B · destinations, masked on O > 0.
                 _async_write(
                     writer, comp_cit,
                     np.where(
                         destinations_segs > 0,
-                        d7_stack * traveling_population, 0,
+                        d7_stack * destinations_segs, 0,
                     ),
                     DataKey(
                         "Pot_concproduct", part_of_day=pod,
