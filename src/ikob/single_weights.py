@@ -86,7 +86,7 @@ def _num_zones_from_weights(w):
 
 def add_bike_weights(part_of_day, regimes, motive_name, decay_curve, income, generalized_travel_time, weights, config):
     project_config = config["project"]
-    modalities_bike = ["E-fiets"] if project_config["fiets of E-fiets"]["E-fiets"] else ["Fiets"]
+    modalities_bike = ["EFiets"] if project_config["fiets of E-fiets"]["E-fiets"] else ["Fiets"]
     for preference in ALL_PREFERENCES:
         for modality in modalities_bike:
             if preference == "Auto" or preference == "Fiets":
