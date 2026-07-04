@@ -95,6 +95,12 @@ def default_project_tab():
                 default=DecayCurveName.WORK_AND_SOCIAL,
                 items=list(DecayCurveName),
             ),
+            "tolerantiecurven": config_item(
+                "Curve-bibliotheek (optioneel, .json van de tolerantiecurve-editor) — "
+                "overschrijft de reistijdvervalscurve voor de groepen die erin staan",
+                DataType.FILE,
+                default="",
+            ),
         },
         "fiets of E-fiets": {
             "label": "Rekenen met Fiets of E-fiets",

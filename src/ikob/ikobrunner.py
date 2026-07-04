@@ -16,8 +16,20 @@ from ikob.ikobconfig import get_config_from_args, load_config
 from ikob.reachable_destinations import reachable_destinations
 from ikob.reachable_population import reachable_population
 from ikob.single_weights import calculate_single_weights
+from ikob.tolerance_curves import CurveRegistry
 
 logger = logging.getLogger(__name__)
+
+
+def _load_curve_registry(config) -> CurveRegistry | None:
+    """Load the optional curve-library attached to this project's motief
+    config (see configuration_definition.default_project_tab), if any."""
+    curve_lib_path = config.get("project", {}).get("motief", {}).get("tolerantiecurven", "")
+    if not curve_lib_path:
+        return None
+    registry = CurveRegistry.from_json(curve_lib_path)
+    logger.info("Loaded curve-library %s with %d group attachment(s).", curve_lib_path, len(registry))
+    return registry
 
 
 def run_scripts(project_file, skip_steps: list[bool] | None = None, write_weights: bool = False):
@@ -28,6 +40,9 @@ def run_scripts(project_file, skip_steps: list[bool] | None = None, write_weight
     - Combined weights are lazy (recipes only) → ~50 % less peak RAM
     - GTT cache cleared immediately after D2
     - D4/D5 and D6/D7 still run in parallel
+    - Optional curve-library attachments (project.motief.tolerantiecurven)
+      override the legacy decay curve for specific groups -- see
+      ikob.curve_attachment.
     """
     logger.info("Reading project file: %s.", project_file)
     config = get_config_from_args(project_file)
@@ -36,13 +51,15 @@ def run_scripts(project_file, skip_steps: list[bool] | None = None, write_weight
     if not valid:
         raise ValueError("Invalid input files, see console warnings.")
 
+    curve_registry = _load_curve_registry(config)
+
     logger.info("Starting simulations...")
     if not skip_steps:
         skip_steps = [False] * 8
 
     # ── D1: Generalized travel time ──
     if not skip_steps[0]:
-        travel_time = generalized_travel_time(config)
+        travel_time = generalized_travel_time(config, curve_registry=curve_registry)
     else:
         travel_time = DataSource(config, DataType.GENERALIZED_TRAVEL_TIME)
 
@@ -52,7 +69,7 @@ def run_scripts(project_file, skip_steps: list[bool] | None = None, write_weight
 
     # ── D2: Single weights ──
     if not skip_steps[2]:
-        single_weights = calculate_single_weights(config, travel_time)
+        single_weights = calculate_single_weights(config, travel_time, curve_registry=curve_registry)
     else:
         single_weights = DataSource(config, DataType.WEIGHTS)
 

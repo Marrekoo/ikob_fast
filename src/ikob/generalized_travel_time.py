@@ -1,4 +1,5 @@
 import logging
+from dataclasses import replace
 
 import numpy as np
 
@@ -14,21 +15,45 @@ from ikob.datasource import (
     read_csv_from_config,
     read_parking_times,
 )
+from ikob.tolerance_curves import CurveRegistry
 from ikob.utils import DTYPE, IKOB_INFINITE
 
 logger = logging.getLogger(__name__)
 
 
-def generalized_travel_time(config) -> DataSource:
+def _maybe_store_time_money(gtt_source: DataSource, curve_registry, base_key: DataKey, t, m):
+    """Also cache the raw (time, money) components behind *base_key*,
+    tagged via DataKey.subtopic ('tijd' / 'geld'), so a curve-library
+    attachment (ikob.curve_attachment) can evaluate a custom -- possibly
+    'copula' or custom-tau 'fixedVOT' -- tolerance curve on them in D2.
+
+    Skipped entirely when no curve_registry is supplied, so a default run
+    without a curve library has the exact same memory/CPU footprint as
+    before this feature was added.
+    """
+    if curve_registry is None or len(curve_registry) == 0:
+        return
+    gtt_source.set(replace(base_key, subtopic="tijd"), np.asarray(t, dtype=DTYPE))
+    gtt_source.set(replace(base_key, subtopic="geld"), np.asarray(m, dtype=DTYPE))
+
+
+def generalized_travel_time(config, curve_registry: CurveRegistry | None = None) -> DataSource:
     """
     Compute generalized (experienced) travel time from time and costs.
     Corresponds to section D1 in IKOB-algorithm.pdf
+
+    *curve_registry*, if given, additionally stores the un-collapsed
+    (time, money) components for every skim below (except the
+    chains-adjusted car skims, see the note there) so that D2
+    (single_weights.py) can evaluate a curve-library attachment on them
+    -- see ikob.curve_attachment.
 
     KEY CHANGES vs original:
     - "geen auto" double for-loop fully vectorised
     - "gratis auto" double for-loop fully vectorised
     - All skim matrices cast to float32 on load
     - .copy() removed where new arrays are created by vectorised ops
+    - optional (time, money) component storage for curve-library support
     """
     logger.info("Starting step: Compute generalized travel time from time and costs.")
 
@@ -130,6 +155,8 @@ def generalized_travel_time(config) -> DataSource:
                 header=DataKey.zone_header(num_zones), index=DataKey.zone_index(num_zones),
             )
             gtt_source.set(key, gtr_skim)
+            t_bike, m_bike = utils.compute_bike_time_money(bike_time_matrix, bike_distance_matrix, bike_cost_euro_per_km)
+            _maybe_store_time_money(gtt_source, curve_registry, key, t_bike, m_bike)
 
             # ── Car GTT (already vectorised via compute_car_gtt) ──
             for fuel_kind in fuel_kinds:
@@ -150,6 +177,18 @@ def generalized_travel_time(config) -> DataSource:
                     parking_times_array=parking_times_arr,
                     parking_costs_array_eurocent=parking_cost_array,
                 )
+                # NOTE: when chains=True, gtr_skim below is further combined
+                # with the P+R / P+Bike alternatives via elementwise minimum.
+                # We deliberately store the *plain-drive* (time, money) pair
+                # (computed below, before that minimum) rather than trying to
+                # track which alternative "won" per OD pair. A curve-library
+                # attachment therefore ignores hub alternatives for now; this
+                # is a known, logged limitation, not a silent approximation.
+                t_car, m_car = utils.compute_car_time_money(
+                    car_time_matrix, car_distance_matrix, var_car_rate, road_pricing,
+                    additional_cost_matrix, parking_times_arr, parking_cost_array,
+                )
+
                 if chains:
                     key = DataKey(
                         id=f"Pplusfiets_{fuel_kind}", part_of_day=pod, income=income_level,
@@ -163,12 +202,19 @@ def generalized_travel_time(config) -> DataSource:
                     )
                     gtr_park_and_ride_skim = gtt_source.get(key)
                     gtr_skim = np.minimum(bestskim, gtr_park_and_ride_skim)
+                    if curve_registry is not None and len(curve_registry) > 0:
+                        logger.warning(
+                            "Chains (P+R/P+Bike) are enabled and a curve-library was "
+                            "supplied: the decomposed time/money skim used for custom "
+                            "curves ignores hub alternatives (direct-drive only)."
+                        )
 
                 key = DataKey(
                     id=f"Auto_{fuel_kind}", part_of_day=pod, income=income_level, regime=regime, motive=motive_name,
                     header=DataKey.zone_header(num_zones), index=DataKey.zone_index(num_zones),
                 )
                 gtt_source.set(key, gtr_skim)
+                _maybe_store_time_money(gtt_source, curve_registry, key, t_car, m_car)
 
             # ── PT GTT (already vectorised) ──
             gtr_skim = utils.compute_pt_gtt(pt_time_matrix, pt_cost_matrix, tvom_factor)
@@ -177,6 +223,8 @@ def generalized_travel_time(config) -> DataSource:
                 header=DataKey.zone_header(num_zones), index=DataKey.zone_index(num_zones),
             )
             gtt_source.set(key, gtr_skim)
+            t_pt, m_pt = utils.compute_pt_time_money(pt_time_matrix, pt_cost_matrix)
+            _maybe_store_time_money(gtt_source, curve_registry, key, t_pt, m_pt)
 
             # ── Geen auto: VECTORISED (was double for-loop) ──
             for kind in kind_no_car:
@@ -190,6 +238,10 @@ def generalized_travel_time(config) -> DataSource:
                     header=DataKey.zone_header(num_zones), index=DataKey.zone_index(num_zones),
                 )
                 gtt_source.set(key, gtr_skim)
+                t_nc, m_nc = utils.compute_no_car_time_money(
+                    car_time_matrix, car_distance_matrix, time_cost_factor, var_cost_factor
+                )
+                _maybe_store_time_money(gtt_source, curve_registry, key, t_nc, m_nc)
 
             # ── Gratis auto: VECTORISED (was double for-loop) ──
             total_time = car_time_matrix + parking_time_matrix
@@ -203,6 +255,12 @@ def generalized_travel_time(config) -> DataSource:
                 header=DataKey.zone_header(num_zones), index=DataKey.zone_index(num_zones),
             )
             gtt_source.set(key, gtr_skim)
+            t_free, m_free = utils.compute_free_car_time_money(
+                car_time_matrix, car_distance_matrix, road_pricing_electric,
+                parking_time_matrix, parking_cost_array,
+                additional_cost_matrix if additional_costs else None,
+            )
+            _maybe_store_time_money(gtt_source, curve_registry, key, t_free, m_free)
 
             # ── Gratis OV (already vectorised) ──
             gtr_skim = np.where(pt_time_matrix > 0.5, pt_time_matrix, IKOB_INFINITE).astype(DTYPE)
@@ -211,5 +269,8 @@ def generalized_travel_time(config) -> DataSource:
                 header=DataKey.zone_header(num_zones), index=DataKey.zone_index(num_zones),
             )
             gtt_source.set(key, gtr_skim)
+            t_free_ov = np.where(pt_time_matrix > 0.5, pt_time_matrix, IKOB_INFINITE)
+            m_free_ov = np.zeros_like(t_free_ov)  # free PT: no money component at all
+            _maybe_store_time_money(gtt_source, curve_registry, key, t_free_ov, m_free_ov)
 
     return gtt_source

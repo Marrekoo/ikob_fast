@@ -214,6 +214,24 @@ def combined_group(mod, gr):
 
 
 # ── Vectorised generalized-travel-time helpers ──────────────────────
+#
+# Each "*_gtt" function collapses (time, money) into one generalized
+# travel time via  gtt = time + tvom_factor * money.  The "*_time_money"
+# companions expose the two components *before* that collapse, so a
+# per-group tolerance curve (ikob.tolerance_curves) can be evaluated on
+# them directly -- e.g. a custom tau (fixedVOT) or a genuine 2-D copula,
+# neither of which can be reconstructed from the collapsed gtt alone.
+# The "*_gtt" functions are thin wrappers so their output stays
+# bit-for-bit identical to before this split.
+
+
+def compute_bike_time_money(
+    bike_time_matrix: npt.NDArray,
+    bike_distance_matrix: npt.NDArray,
+    bike_cost_euro_per_km: float,
+):
+    """(time [min], money [euro]) components of the bike GTT."""
+    return bike_time_matrix, bike_distance_matrix * bike_cost_euro_per_km
 
 
 def compute_bike_gtt(
@@ -222,11 +240,45 @@ def compute_bike_gtt(
     bike_cost_euro_per_km: float,
     tvom_factor: float,
 ):
-    return (bike_time_matrix + tvom_factor * bike_distance_matrix * bike_cost_euro_per_km).astype(DTYPE)
+    t, m = compute_bike_time_money(bike_time_matrix, bike_distance_matrix, bike_cost_euro_per_km)
+    return (t + tvom_factor * m).astype(DTYPE)
+
+
+def compute_pt_time_money(pt_time_matrix: npt.NDArray, pt_cost_matrix: npt.NDArray):
+    """(time [min], money [euro]) components of the PT GTT.
+
+    Unreachable OD pairs (pt_time <= 0.5) get time = IKOB_INFINITE,
+    money = 0, so that t + tau*m == IKOB_INFINITE regardless of tau --
+    matching compute_pt_gtt's masking exactly.
+    """
+    t = np.where(pt_time_matrix > 0.5, pt_time_matrix, IKOB_INFINITE)
+    m = np.where(pt_time_matrix > 0.5, pt_cost_matrix, 0.0)
+    return t, m
 
 
 def compute_pt_gtt(pt_time_matrix: npt.NDArray, pt_cost_matrix: npt.NDArray, tvom_factor: float):
-    return np.where(pt_time_matrix > 0.5, pt_time_matrix + tvom_factor * pt_cost_matrix, IKOB_INFINITE).astype(DTYPE)
+    t, m = compute_pt_time_money(pt_time_matrix, pt_cost_matrix)
+    return (t + tvom_factor * m).astype(DTYPE)
+
+
+def compute_car_time_money(
+    car_time: npt.NDArray,
+    car_dist: npt.NDArray,
+    var_rate: float,
+    road_pricing: float,
+    additional_costs_eurocent: npt.NDArray,
+    parking_times_array: npt.NDArray,
+    parking_costs_array_eurocent: npt.NDArray,
+):
+    """(time [min], money [euro]) components of the car GTT."""
+    parking_time_matrix = parking_times_array[:, 0][:, np.newaxis] + parking_times_array[:, 1][np.newaxis, :]
+    t = car_time + parking_time_matrix
+    m = (
+        (var_rate + road_pricing) * car_dist
+        + additional_costs_eurocent / 100
+        + parking_costs_array_eurocent / 100
+    )
+    return t, m
 
 
 def compute_car_gtt(
@@ -239,13 +291,31 @@ def compute_car_gtt(
     parking_times_array: npt.NDArray,
     parking_costs_array_eurocent: npt.NDArray,
 ):
-    parking_time_matrix = parking_times_array[:, 0][:, np.newaxis] + parking_times_array[:, 1][np.newaxis, :]
-    return (
-        car_time
-        + parking_time_matrix
-        + tvom_factor
-        * ((var_rate + road_pricing) * car_dist + additional_costs_eurocent / 100 + parking_costs_array_eurocent / 100)
-    ).astype(DTYPE)
+    t, m = compute_car_time_money(
+        car_time, car_dist, var_rate, road_pricing,
+        additional_costs_eurocent, parking_times_array, parking_costs_array_eurocent,
+    )
+    return (t + tvom_factor * m).astype(DTYPE)
+
+
+def compute_no_car_time_money(car_time_matrix, car_distance_matrix, time_cost_factor, var_cost_factor):
+    """(time [min], money [euro]) components for the GeenAuto/GeenRijbewijs
+    (car-sharing / taxi proxy) GTT formula in generalized_travel_time.py."""
+    t = car_time_matrix
+    m = car_time_matrix * time_cost_factor + car_distance_matrix * var_cost_factor
+    return t, m
+
+
+def compute_free_car_time_money(
+    car_time_matrix, car_distance_matrix, road_pricing_electric,
+    parking_time_matrix, parking_cost_array, additional_cost_matrix=None,
+):
+    """(time [min], money [euro]) components for the GratisAuto GTT formula."""
+    t = car_time_matrix + parking_time_matrix
+    m = car_distance_matrix * road_pricing_electric + parking_cost_array[np.newaxis, :] / 100
+    if additional_cost_matrix is not None:
+        m = m + additional_cost_matrix / 100
+    return t, m
 
 
 def costs_public_transport(distance, pt_km_price, starting_rate, pricecap, pricecap_value):
@@ -254,7 +324,6 @@ def costs_public_transport(distance, pt_km_price, starting_rate, pricecap, price
     if pricecap:
         np.clip(distance, None, pricecap_value, out=distance)
     return distance
-
 
 # ── Sparse helper ────────────────────────────────────────────────────
 
