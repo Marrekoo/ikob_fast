@@ -71,8 +71,30 @@ def default_project_tab():
         ),
         "paden": {
             "label": "Paden",
-            "skims_directory": config_item("Basis directory", DataType.DIRECTORY),
-            "segs_directory": config_item("SEGS directory", DataType.DIRECTORY),
+            "skims_directory": config_item(
+                "Basis directory voor CSV-skims (genegeerd als skims.skims_bron niet 'bestanden' is)",
+                DataType.DIRECTORY,
+            ),
+            "segs_format": config_item(
+                "Formaat van de SEGS/CBS-brondata",
+                DataType.CHOICE,
+                default="csv",
+                items=["csv", "gpkg"],
+            ),
+            "segs_directory": config_item("SEGS directory (csv-formaat)", DataType.DIRECTORY),
+            "segs_bestand": config_item(
+                "SEGS/CBS GeoPackage-bestand (gpkg-formaat)", DataType.FILE
+            ),
+            "segs_buurten_laag": config_item(
+                "Laagnaam met de referentie-buurtgeometrie in het GeoPackage",
+                DataType.TEXT,
+                default="buurten",
+            ),
+            "segs_buurtcode_kolom": config_item(
+                "Kolomnaam met de (CBS-)buurtcode in elke laag van het GeoPackage",
+                DataType.TEXT,
+                default="buurtcode",
+            ),
             "output_directory": config_item("Output directory", DataType.DIRECTORY, default="output"),
         },
         "motief": {
@@ -126,6 +148,20 @@ def default_skims_tab():
             DataType.CHECKLIST,
             default="Restdag",
             items=["Ochtendspits", "Restdag", "Avondspits"],
+        ),
+        "skims_bron": config_item(
+            "Bron van de skims (tijd/afstand/kosten-matrices)",
+            DataType.CHOICE,
+            default="bestanden",
+            items=["bestanden", "r5py", "osrm"],
+        ),
+        "zone_locaties_bestand": config_item(
+            "Zone-locaties voor route-gebaseerde skims (r5py/OSRM): csv met kolommen "
+            "zone,lon,lat, of gpkg met een laag 'zones' (puntgeometrie + kolom "
+            "'buurtcode'); leeg = gebruik buurt-centroïden uit de SEGS GeoPackage "
+            "(vereist paden.segs_format = 'gpkg')",
+            DataType.FILE,
+            default="",
         ),
         "OV kosten": {
             "starttarief": config_item(
@@ -221,6 +257,25 @@ def default_skims_tab():
             default=0.0,
             unit="Eurocent/km",
         ),
+        "r5py": {
+            "label": "Skims genereren met r5py (R5-routing op OSM + GTFS)",
+            "osm_pbf": config_item("OpenStreetMap .osm.pbf bestand", DataType.FILE),
+            "gtfs_directory": config_item("Map met GTFS .zip-bestanden (voor OV)", DataType.DIRECTORY),
+            "vertrekdatum": config_item("Vertrekdatum (JJJJ-MM-DD) voor de routing", DataType.TEXT, default="2024-04-10"),
+            "vertrektijd_ochtendspits": config_item("Vertrektijd ochtendspits (UU:MM)", DataType.TEXT, default="08:00"),
+            "vertrektijd_restdag": config_item("Vertrektijd restdag (UU:MM)", DataType.TEXT, default="11:00"),
+            "vertrektijd_avondspits": config_item("Vertrektijd avondspits (UU:MM)", DataType.TEXT, default="17:00"),
+            "max_reistijd_minuten": config_item("Maximale reistijd om te routeren", DataType.NUMBER, default=180),
+        },
+        "osrm": {
+            "label": "Skims genereren met OSRM (alleen auto en fiets, geen OV)",
+            "auto_server": config_item(
+                "OSRM-server URL voor auto (profiel 'driving')", DataType.TEXT, default="http://localhost:5000"
+            ),
+            "fiets_server": config_item(
+                "OSRM-server URL voor fiets (profiel 'cycling')", DataType.TEXT, default="http://localhost:5001"
+            ),
+        },
     }
 
 

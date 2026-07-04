@@ -5,7 +5,8 @@ import numpy.typing as npt
 
 from ikob import utils
 from ikob.configuration_definition import TvomType
-from ikob.datasource import DataKey, DataSource, SkimsSource, read_csv_from_config, read_parking_times
+from ikob.datasource import DataKey, DataSource, read_csv_from_config, read_parking_times
+from ikob.skims_provider import get_skims_provider
 from ikob.utils import IKOB_INFINITE, costs_public_transport
 
 logger = logging.getLogger(__name__)
@@ -70,16 +71,12 @@ def compute_chain_travel_time(
     """
     num_zones = len(car_time)
 
-    # Only compute chain travel times for zones in the destination_list.
-    # This allows a user to investigate hub locations to improve travel times to only a subset of the total zones.
     destination_mask = np.zeros(num_zones, dtype=bool)
     destination_mask[destination_list - 1] = True  # Zones in config use 1 based indexing
 
-    # Initialize with true infinite values to overwrite these with gtt even if those are above IKOB_INFINITE
     result_bike = np.full((num_zones, num_zones), np.inf)
     result_ride = np.full((num_zones, num_zones), np.inf)
 
-    # Hubs have their own transfer time that includes the parking time
     hub_parking_times = parking_times.copy()
     hub_parking_times[:, 1] = 0.0
 
@@ -94,7 +91,6 @@ def compute_chain_travel_time(
     change_time_pt = hubs.pt_transfer_times
     pay_for_pt = hubs.pay_for_pt
 
-    # Travel via a hub consist of going by car to the hub, then continuing either by bike or by pt
     car_part = (
         utils.compute_car_gtt(
             car_time=car_time,
@@ -103,7 +99,7 @@ def compute_chain_travel_time(
             road_pricing=road_pricing,
             tvom_factor=tvom_factor,
             additional_costs_eurocent=additional_costs,
-            parking_costs_array_eurocent=np.zeros(num_zones),  # parking costs are in the hub_cost
+            parking_costs_array_eurocent=np.zeros(num_zones),
             parking_times_array=hub_parking_times,
         )[:, hub_zones]
         + hub_costs[np.newaxis, :] * tvom_factor
@@ -113,7 +109,6 @@ def compute_chain_travel_time(
         pt_time[hub_zones, :], pt_cost[hub_zones, :] * pay_for_pt[:, np.newaxis], tvom_factor
     )
 
-    # Car from origin to hub, then some change time at the hub, then bike / pt from hub destination
     p_bike = (
         car_part[:, :, np.newaxis]
         + change_time_bike[np.newaxis, :, np.newaxis]
@@ -174,8 +169,7 @@ def chain_generator(generalized_travel_time: DataSource, config: dict):
     income_levels = ["laag", "middellaag", "middelhoog", "hoog"]
     fuel_kinds = ["fossiel", "elektrisch"]
 
-    skims_dir = config["project"]["paden"]["skims_directory"]
-    skims_reader = SkimsSource(skims_dir)
+    skims_reader = get_skims_provider(config)
 
     parking_times = read_parking_times(config)
     num_zones = len(parking_times)

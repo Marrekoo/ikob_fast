@@ -19,8 +19,16 @@ class FileValidator:
 
     def validate_input_files(self):
         logger.info("validating input files")
-        num_zones, valid = self._skims_files_validation()
-        if valid:
+
+        from ikob.config.geo_validate import validate_geo_inputs
+        # Config-level checks for GeoPackage SEGS input and/or a
+        # route-generation skims backend (r5py/OSRM); cheap (no routing,
+        # no full skim generation), so safe to run on every validation.
+        valid = validate_geo_inputs(self.config)
+
+        num_zones, skims_valid = self._skims_files_validation()
+        valid &= skims_valid
+        if skims_valid:
             valid &= self._motive_files_validation(num_zones)
             valid &= self._chain_files_validation(num_zones)
 
@@ -64,6 +72,93 @@ class FileValidator:
         return valid
 
     def _skims_files_validation(self):
+        """Dispatch to CSV-file validation, or -- when the project is
+        configured to generate skims on the fly (r5py/OSRM) -- to a
+        lightweight config-only check that avoids actually running any
+        routing computation just to validate a project file."""
+        skims_bron = self.config["skims"].get("skims_bron", "bestanden")
+        if skims_bron != "bestanden":
+            return self._skims_provider_config_validation(skims_bron)
+        return self._skims_csv_files_validation()
+
+    def _skims_provider_config_validation(self, skims_bron):
+        """Validate a route-generation skims backend (r5py/OSRM) without
+        actually generating any skims: check that its own configuration
+        is sane (ikob.config.geo_validate.validate_geo_inputs, already
+        folded into the overall result by validate_input_files), that
+        the number of zones can be determined cheaply from the SEGS
+        input, and that the (still file-based) parking times/costs match
+        that zone count."""
+        try:
+            num_zones = self._determine_num_zones_without_skims()
+        except Exception as e:
+            logger.warning(
+                f"Could not determine the number of zones without reading skims "
+                f"(skims_bron='{skims_bron}'): \n",
+                exc_info=e,
+            )
+            return -1, False
+
+        if num_zones <= 0:
+            logger.warning(f"Determined an invalid number of zones ({num_zones}).")
+            return -1, False
+
+        parking_costs = self.config["geavanceerd"]["parkeerkosten"]["gebruiken"]
+        try:
+            parking_times = read_parking_times(self.config)
+            if parking_costs:
+                parking_cost_array = read_csv_from_config(self.config, key="geavanceerd", id="parkeerkosten")
+            else:
+                parking_cost_array = utils.zeros(len(parking_times))
+        except Exception as e:
+            logger.warning(
+                "A problem occurred while attempting to load parking times/costs: \n",
+                exc_info=e,
+            )
+            return num_zones, False
+
+        if not (len(parking_times) == num_zones and len(parking_cost_array) == num_zones):
+            logger.warning(
+                f"Parking times/costs are expected to have length equal to the "
+                f"number of zones ({num_zones}), but found "
+                f"{len(parking_times)} parking time entries and "
+                f"{len(parking_cost_array)} parking cost entries."
+            )
+            return num_zones, False
+
+        logger.info(
+            f"skims_bron is '{skims_bron}': skims matrices will be generated at "
+            f"run time and are not validated up front. Derived {num_zones} zones "
+            "from the SEGS input."
+        )
+        return num_zones, True
+
+    def _determine_num_zones_without_skims(self):
+        """Derive the number of zones without reading (or generating) any
+        skim, for use when skims_bron != 'bestanden'.
+
+        Uses the buurten reference layer for GeoPackage SEGS input (cheap:
+        geometry only, no routing), or otherwise the shape of the
+        motive's traveling-population SEGS file (the same file
+        _motive_files_validation checks anyway)."""
+        paden = self.config["project"]["paden"]
+        if paden.get("segs_format", "csv") == "gpkg":
+            from ikob import geo_utils
+
+            gpkg_path = paden.get("segs_bestand", "")
+            buurten_layer = paden.get("segs_buurten_laag", "buurten")
+            buurtcode_column = paden.get("segs_buurtcode_kolom", "buurtcode")
+            gdf = geo_utils.validate_cbs_buurt_layer(gpkg_path, buurten_layer, buurtcode_column)
+            return len(gdf)
+
+        motive = self.config["project"]["motief"]
+        scenario = self.config["project"]["verstedelijkingsscenario"]
+        traveling_population_path = Path(motive["reizende populatie"])
+        segs_source = SegsSource(self.config)
+        content = segs_source.read(traveling_population_path.name, scenario=scenario)
+        return content.shape[0]
+
+    def _skims_csv_files_validation(self):
         part_of_day = self.config["skims"]["dagsoort"]
 
         skims_dir = self.config["project"]["paden"]["skims_directory"]

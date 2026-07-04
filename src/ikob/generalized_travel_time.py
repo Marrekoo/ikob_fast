@@ -11,10 +11,10 @@ from ikob.datasource import (
     DataSource,
     DataType,
     SegsSource,
-    SkimsSource,
     read_csv_from_config,
     read_parking_times,
 )
+from ikob.skims_provider import get_skims_provider
 from ikob.tolerance_curves import CurveRegistry
 from ikob.utils import DTYPE, IKOB_INFINITE
 
@@ -33,8 +33,8 @@ def _maybe_store_time_money(gtt_source: DataSource, curve_registry, base_key: Da
     """
     if curve_registry is None or len(curve_registry) == 0:
         return
-    gtt_source.set(replace(base_key, subtopic="tijd"), np.asarray(t, dtype=DTYPE))
-    gtt_source.set(replace(base_key, subtopic="geld"), np.asarray(m, dtype=DTYPE))
+    gtt_source.set(replace(base_key, subtopic="tijd", is_temporary=True), np.asarray(t, dtype=DTYPE))
+    gtt_source.set(replace(base_key, subtopic="geld", is_temporary=True), np.asarray(m, dtype=DTYPE))
 
 
 def generalized_travel_time(config, curve_registry: CurveRegistry | None = None) -> DataSource:
@@ -48,12 +48,17 @@ def generalized_travel_time(config, curve_registry: CurveRegistry | None = None)
     (single_weights.py) can evaluate a curve-library attachment on them
     -- see ikob.curve_attachment.
 
+    Skims themselves come from config["skims"]["skims_bron"] -- either
+    pre-computed CSV files, or generated on the fly via r5py/OSRM -- see
+    ikob.skims_provider.get_skims_provider().
+
     KEY CHANGES vs original:
     - "geen auto" double for-loop fully vectorised
     - "gratis auto" double for-loop fully vectorised
     - All skim matrices cast to float32 on load
     - .copy() removed where new arrays are created by vectorised ops
     - optional (time, money) component storage for curve-library support
+    - pluggable skims source (files / r5py / OSRM)
     """
     logger.info("Starting step: Compute generalized travel time from time and costs.")
 
@@ -110,8 +115,7 @@ def generalized_travel_time(config, curve_registry: CurveRegistry | None = None)
 
     SegsSource(config)
 
-    skims_dir = config["project"]["paden"]["skims_directory"]
-    skims_reader = SkimsSource(skims_dir)
+    skims_reader = get_skims_provider(config)
 
     gtt_source = DataSource(config, DataType.GENERALIZED_TRAVEL_TIME)
 
@@ -177,13 +181,6 @@ def generalized_travel_time(config, curve_registry: CurveRegistry | None = None)
                     parking_times_array=parking_times_arr,
                     parking_costs_array_eurocent=parking_cost_array,
                 )
-                # NOTE: when chains=True, gtr_skim below is further combined
-                # with the P+R / P+Bike alternatives via elementwise minimum.
-                # We deliberately store the *plain-drive* (time, money) pair
-                # (computed below, before that minimum) rather than trying to
-                # track which alternative "won" per OD pair. A curve-library
-                # attachment therefore ignores hub alternatives for now; this
-                # is a known, logged limitation, not a silent approximation.
                 t_car, m_car = utils.compute_car_time_money(
                     car_time_matrix, car_distance_matrix, var_car_rate, road_pricing,
                     additional_cost_matrix, parking_times_arr, parking_cost_array,

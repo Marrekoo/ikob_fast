@@ -90,15 +90,92 @@ class SkimsSource:
         return default
 
 
+class _CsvSegsInputBackend:
+    """Legacy behaviour: one indexed CSV per raw input table."""
+
+    def __init__(self, segs_dir: pathlib.Path):
+        self.segs_dir = segs_dir
+
+    def _dir(self, id, jaar, scenario):
+        filename = id + jaar
+        path = self.segs_dir / scenario
+        os.makedirs(path, exist_ok=True)
+        return path / filename
+
+    def read(self, id, jaar, type_caster, scenario, has_index_column):
+        path = self._dir(id, jaar, scenario).with_suffix(".csv")
+        try:
+            return utils.read_csv(path, type_caster=type_caster, has_index_column=has_index_column)
+        except FileNotFoundError:
+            raise DataSourceError(
+                f"File SEGS file '{path}' not found. Is the scenario '{scenario}' correct?"
+            )
+
+
+class _GpkgSegsInputBackend:
+    """Buurtcode-keyed GeoPackage backend for CBS opendata.
+
+    Every table is read as a layer named *id* (optionally suffixed with
+    the year/scenario, mirroring the old CSV naming convention), joined
+    onto a canonical zone order derived once from the reference buurten
+    geometry layer -- see ikob.geo_utils.
+    """
+
+    def __init__(self, config):
+        from ikob import geo_utils  # local import: optional geopandas dependency
+
+        self._geo_utils = geo_utils
+        paden = config["project"]["paden"]
+
+        gpkg_path = paden.get("segs_bestand", "")
+        if not gpkg_path:
+            raise DataSourceError(
+                "project.paden.segs_format is 'gpkg' but project.paden.segs_bestand is empty."
+            )
+        self.gpkg_path = pathlib.Path(gpkg_path)
+        self.buurtcode_column = paden.get("segs_buurtcode_kolom", "buurtcode")
+        buurten_layer = paden.get("segs_buurten_laag", "buurten")
+
+        reference = geo_utils.validate_cbs_buurt_layer(
+            self.gpkg_path, buurten_layer, buurtcode_column=self.buurtcode_column,
+        )
+        self.zone_order = geo_utils.canonical_zone_order(reference[self.buurtcode_column])
+        logger.info("SEGS GeoPackage %s: %d buurten found in reference layer '%s'.",
+                   self.gpkg_path, len(self.zone_order), buurten_layer)
+
+    def _resolve_layer_name(self, id, jaar, scenario):
+        candidates = [f"{id}{jaar}_{scenario}", f"{id}_{scenario}", f"{id}{jaar}", id]
+        available = set(self._geo_utils.list_layers(self.gpkg_path))
+        for candidate in candidates:
+            if candidate in available:
+                return candidate
+        raise DataSourceError(
+            f"None of the candidate layers {candidates} were found in {self.gpkg_path} "
+            f"for SEGS table '{id}'. Available layers: {sorted(available)}."
+        )
+
+    def read(self, id, jaar, type_caster, scenario, has_index_column):
+        layer = self._resolve_layer_name(id, jaar, scenario)
+        df = self._geo_utils.read_layer(self.gpkg_path, layer)
+        result = self._geo_utils.reindex_to_zone_order(df, self.zone_order, self.buurtcode_column)
+        return result.astype(type_caster)
+
+
 class SegsSource:
     def __init__(self, config):
-        self.segs_dir = pathlib.Path(config["project"]["paden"]["segs_directory"])
-        if self.segs_dir == "":
-            raise DataSourceError("Skims source initialized with empty skims dir")
-        self.tmp_dir = get_temporary_directory(config)
+        paden = config["project"]["paden"]
+        self._format = paden.get("segs_format", "csv")
 
-    def _segs_input_dir(self, id, jaar, scenario):
-        return self._segs_dir(self.segs_dir, id, jaar, scenario)
+        if self._format == "gpkg":
+            self._input_backend = _GpkgSegsInputBackend(config)
+            self.segs_dir = pathlib.Path(paden.get("segs_bestand", ""))
+        else:
+            self.segs_dir = pathlib.Path(paden["segs_directory"])
+            if str(self.segs_dir) == "":
+                raise DataSourceError("Skims source initialized with empty skims dir")
+            self._input_backend = _CsvSegsInputBackend(self.segs_dir)
+
+        self.tmp_dir = get_temporary_directory(config)
 
     def _segs_output_dir(self, id, jaar, scenario, group="", modifier=""):
         root = self.tmp_dir / "groepenverdeling"
@@ -118,16 +195,20 @@ class SegsSource:
         should_read_from_output = "Verdeling_over_groepen" in id
         if should_read_from_output:
             path = self._segs_output_dir(id=id, jaar=jaar, scenario=scenario, group=group, modifier=modifier)
-        else:
-            path = self._segs_input_dir(id, jaar, scenario)
+            path = path.with_suffix(".csv")
+            try:
+                return utils.read_csv(path, type_caster=type_caster, has_index_column=has_index_column)
+            except FileNotFoundError:
+                raise DataSourceError(
+                    f"File SEGS file '{path}' not found. Is the scenario '{scenario}' correct?"
+                )
 
-        path = path.with_suffix(".csv")
-        try:
-            return utils.read_csv(path, type_caster=type_caster, has_index_column=has_index_column)
-        except FileNotFoundError:
-            raise DataSourceError(
-                f"File SEGS file '{path}' not found. Is the scenario '{scenario}' correct?"
-            )
+        # Raw input table: 'id' may still be a bare CSV-era filename like
+        # "Beroepsbevolking_inkomensklasse.csv" (as configured under
+        # project.motief); strip that suffix so gpkg layer lookups work
+        # without editing existing config values when switching format.
+        lookup_id = id[:-4] if id.lower().endswith(".csv") else id
+        return self._input_backend.read(lookup_id, jaar, type_caster, scenario, has_index_column)
 
     def write_csv(self, data, id, header, group="", jaar="", modifier="", scenario="",
                   index: utils.CsvIndex = utils.CsvIndex()):
