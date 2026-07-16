@@ -1,47 +1,8 @@
-import logging
-
 from ikob.configuration_definition import DecayCurveName
-
-logger = logging.getLogger(__name__)
-
-# Modalities that have decay-curve parameters defined (Tables 9-11 in
-# IKOB-algorithm.pdf). Note the canonical spelling "EFiets": the
-# user-facing config uses "E-fiets", but callers must translate to this
-# spelling before calling into this module (see single_weights.py).
-_KNOWN_MODALITIES = frozenset({"Auto", "OV", "Fiets", "EFiets"})
-
-# Preferences ("voorkeuren") that the parameter tables account for.
-# "Neutraal" and "" both fall through to the base parameters on purpose.
-_KNOWN_PREFERENCES = frozenset({"Auto", "Neutraal", "Fiets", "OV", ""})
-
-
-def _validate(modality, preference):
-    """Reject unknown modality/preference strings instead of silently
-    falling through to the base (car) parameters.
-
-    Historically, an unrecognised modality (e.g. the misspelled
-    "E-fiets") would skip every branch below and return the car
-    parameters, producing plausible-looking but wrong weights. Failing
-    fast here makes that class of bug impossible.
-    """
-    if modality not in _KNOWN_MODALITIES:
-        raise ValueError(
-            f"Unknown modality {modality!r}; expected one of "
-            f"{sorted(_KNOWN_MODALITIES)}. "
-            "(Hint: the config spelling 'E-fiets' must be translated to "
-            "'EFiets' before requesting decay parameters.)"
-        )
-    if preference not in _KNOWN_PREFERENCES:
-        raise ValueError(
-            f"Unknown preference {preference!r} for modality {modality!r}; "
-            f"expected one of {sorted(p for p in _KNOWN_PREFERENCES if p)} "
-            "or an empty string."
-        )
 
 
 def work_constants(modality, preference, decay_curve_name: DecayCurveName):
     """Returns the value from Table 9-11 in IKOB-algorithm.pdf"""
-    _validate(modality, preference)
 
     if decay_curve_name == DecayCurveName.WORK_AND_SOCIAL:
         return _work_constants(modality, preference)
