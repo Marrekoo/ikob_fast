@@ -19,6 +19,11 @@ configuration selects (config["skims"]["skims_bron"]):
   - "osrm":      query one or more running OSRM server(s) for car/bike
     skims (OSRM has no transit routing, so OV skims must still come from
     files or r5py).
+
+Zone locations for route-based providers default to buurt centroids
+derived from the *effective* (possibly study-area-filtered) zone set --
+see ikob.geo_utils.effective_zone_order -- so a route-generation run
+always uses exactly the same zone universe as ikob.datasource.SegsSource.
 """
 
 import datetime as dt
@@ -63,13 +68,17 @@ _DAGDEEL_VELD = {
 
 
 def _zone_locations_lonlat(config) -> npt.NDArray:
-    """(N, 2) array of (lon, lat) per zone, in the pipeline's canonical
-    zone order, for use as routing origins/destinations.
+    """(N, 2) array of (lon, lat) per zone, in the project's *effective*
+    zone order (ikob.geo_utils.effective_zone_order), for use as routing
+    origins/destinations.
 
     Prefers an explicit skims.zone_locaties_bestand (csv with columns
     zone,lon,lat, or a gpkg layer named 'zones' with point geometry and a
-    'buurtcode' column); falls back to buurt centroids from the SEGS
-    GeoPackage when project.paden.segs_format is 'gpkg'.
+    'buurtcode' column); falls back to buurt centroids derived from the
+    SEGS GeoPackage's *effective* (possibly study-area-restricted) zone
+    order when project.paden.segs_format is 'gpkg' -- this must match
+    ikob.datasource._GpkgSegsInputBackend's zone order exactly, or SEGS
+    data and route-generated skims would silently misalign.
     """
     from ikob import geo_utils
 
@@ -91,11 +100,19 @@ def _zone_locations_lonlat(config) -> npt.NDArray:
             "skims.zone_locaties_bestand, or set project.paden.segs_format "
             "to 'gpkg' so buurt centroids can be used automatically."
         )
+    if not paden.get("segs_bestand", ""):
+        raise SkimsProviderError(
+            "project.paden.segs_bestand is empty; cannot derive zone "
+            "locations from a GeoPackage."
+        )
+
     gpkg_path = pathlib.Path(paden["segs_bestand"])
     buurten_layer = paden.get("segs_buurten_laag", "buurten")
     buurtcode_column = paden.get("segs_buurtcode_kolom", "buurtcode")
-    gdf = geo_utils.validate_cbs_buurt_layer(gpkg_path, buurten_layer, buurtcode_column)
-    zone_order = geo_utils.canonical_zone_order(gdf[buurtcode_column])
+
+    zone_order = geo_utils.effective_zone_order(config)
+    raw = geo_utils.read_layer(gpkg_path, buurten_layer)
+    gdf = geo_utils.reindex_gdf_to_zone_order(raw, zone_order, buurtcode_column)
     return geo_utils.zone_centroids_lonlat(gdf, zone_order, buurtcode_column)
 
 
